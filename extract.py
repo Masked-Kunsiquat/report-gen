@@ -113,7 +113,7 @@ def load_and_group_inspections(file_path):
             "completion_date": get_safe_string(first_row, "Completion Date"),
             "completed_by": get_safe_string(first_row, "Completed By"),
             "overall_comment": get_safe_string(first_row, "Overall Comment"),
-            "score_percent": get_safe_value(first_row, "Score in Percent"),
+            "score_percent": get_safe_value(first_row, "Score In %"),
             "alert_type": get_safe_string(first_row, "Alert Type"),
             "elements": []
         }
@@ -126,7 +126,7 @@ def load_and_group_inspections(file_path):
                 "score_factor": get_safe_number(row, "Score Factor"),
                 "element_weight_percent": get_safe_number(row, "Element Weight In %"),
                 "rating": get_safe_string(row, "Rating"),
-                "element_score_percent": get_safe_number(row, "Element Score in %"),
+                "element_score_percent": get_safe_number(row, "Element Score In %"),
                 "comments": get_safe_string(row, "Comment"),
                 "attachment": None
             }
