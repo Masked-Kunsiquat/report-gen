@@ -12,9 +12,22 @@ def sanitize_for_json(obj):
     if obj is None:
         return None
     
-    # Handle pandas NaT and numpy NaN
-    if pd.isna(obj):
-        return None
+    # Handle collections recursively first (before pd.isna check)
+    if isinstance(obj, dict):
+        return {key: sanitize_for_json(value) for key, value in obj.items()}
+    if isinstance(obj, (list, tuple)):
+        return [sanitize_for_json(item) for item in obj]
+    if isinstance(obj, np.ndarray):
+        return [sanitize_for_json(item) for item in obj.tolist()]
+    
+    # Handle pandas NaT and numpy NaN (only for scalar-like objects)
+    if not isinstance(obj, (dict, list, tuple, np.ndarray)):
+        try:
+            if pd.isna(obj):
+                return None
+        except (TypeError, ValueError):
+            # pd.isna may fail on some object types, continue with other checks
+            pass
     
     # Handle numpy scalars
     if isinstance(obj, (np.integer, np.int64, np.int32)):
@@ -26,17 +39,14 @@ def sanitize_for_json(obj):
     
     # Handle datetime objects
     if isinstance(obj, (pd.Timestamp, np.datetime64)):
-        if pd.isna(obj):
-            return None
+        try:
+            if pd.isna(obj):
+                return None
+        except (TypeError, ValueError):
+            pass
         return pd.Timestamp(obj).isoformat()
     if isinstance(obj, datetime):
         return obj.isoformat()
-    
-    # Handle collections recursively
-    if isinstance(obj, dict):
-        return {key: sanitize_for_json(value) for key, value in obj.items()}
-    if isinstance(obj, (list, tuple)):
-        return [sanitize_for_json(item) for item in obj]
     
     # Return primitive types as-is
     return obj
