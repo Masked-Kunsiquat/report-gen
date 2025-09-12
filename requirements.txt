@@ -1,5 +1,19 @@
-pandas
-numpy
-xlwings
-pillow
-openpyxl
+# Core data processing
+pandas>=1.5.0
+numpy>=1.21.0
+
+# Excel integration
+xlwings>=0.28.0
+openpyxl>=3.0.9
+
+# Image processing
+Pillow>=9.0.0
+
+# LaTeX/PDF report generation
+# Note: Also requires pdflatex (LaTeX distribution) for PDF compilation
+# Windows: Install MiKTeX or TeX Live
+# macOS: Install MacTeX  
+# Linux: sudo apt-get install texlive-full
+
+# Optional: Enhanced text processing
+# Jinja2>=3.0.0  # Alternative templating engine if needed
