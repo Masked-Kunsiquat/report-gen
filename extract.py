@@ -137,9 +137,6 @@ def load_and_group_inspections(file_path):
 
         inspections.append(inspection_data)
 
-    # Sanitize all inspection data for JSON serialization
-    inspections = sanitize_for_json(inspections)
-    
     # Return row_map as a simple dict (not defaultdict) for JSON serialization safety
     clean_row_map = dict(row_map)
     
@@ -246,7 +243,10 @@ if __name__ == "__main__":
             input_file, inspections, row_map
         )
 
-        print("[Step 6] Image extraction complete. Saving updated JSON...")
+        print("[Step 6] Image extraction complete. Sanitizing data for JSON...")
+        # Sanitize all inspection data for JSON serialization AFTER image processing
+        inspections = sanitize_for_json(inspections)
+        
         with open(output_file, "w", encoding="utf-8") as f:
             json.dump(inspections, f, indent=2, ensure_ascii=False)
 
