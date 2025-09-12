@@ -64,7 +64,7 @@ def load_and_group_inspections(file_path):
     grouped = df_complete.groupby('Inspection #', sort=False)
 
     inspections = []
-    row_map = defaultdict(list)  # Maps inspection_id to row indices
+    row_map = defaultdict(list)  # Maps Excel row number to (inspection_id, element_index)
 
     for inspection_id, group in grouped:
         norm_id = normalize_inspection_id(inspection_id)
@@ -118,7 +118,7 @@ def load_and_group_inspections(file_path):
             "elements": []
         }
 
-        for idx, row in group.iterrows():
+        for element_idx, (idx, row) in enumerate(group.iterrows()):
             element_data = {
                 "zone": get_safe_string(row, "Zone"),
                 "location": get_safe_string(row, "Location"),
@@ -131,16 +131,21 @@ def load_and_group_inspections(file_path):
                 "attachment": None
             }
             inspection_data["elements"].append(element_data)
-            row_map[norm_id].append(idx)
+            # Map Excel row number (1-based) to (inspection_id, element_index)
+            excel_row = idx + 2  # Convert 0-based pandas index to 1-based Excel row (assuming header row)
+            row_map[excel_row] = (norm_id, element_idx)
 
         inspections.append(inspection_data)
 
     # Sanitize all inspection data for JSON serialization
     inspections = sanitize_for_json(inspections)
     
-    return inspections, row_map, df_complete
+    # Return row_map as a simple dict (not defaultdict) for JSON serialization safety
+    clean_row_map = dict(row_map)
+    
+    return inspections, clean_row_map, df_complete
 
-def extract_images_and_update_json(excel_path, inspections):
+def extract_images_and_update_json(excel_path, inspections, row_map):
     # Create private Excel app to avoid process leaks
     app = xw.App(visible=False, add_book=False)
     wb = None
@@ -193,21 +198,23 @@ def extract_images_and_update_json(excel_path, inspections):
                 image_path = os.path.join('attachments', image_filename)
                 img.save(image_path)
 
-                # Match to next available None attachment within the same inspection
+                # Match to specific element using exact Excel row
                 matched = False
-                for inspection in inspections:
-                    if inspection['inspection_id'] == norm_id:
-                        for element in inspection['elements']:
-                            if element.get('attachment') is None:
-                                element['attachment'] = image_path.replace("\\", "/")
+                if row in row_map:
+                    target_inspection_id, element_index = row_map[row]
+                    # Find the target inspection
+                    for inspection in inspections:
+                        if inspection['inspection_id'] == target_inspection_id:
+                            if element_index < len(inspection['elements']):
+                                inspection['elements'][element_index]['attachment'] = image_path.replace("\\", "/")
                                 matched = True
                                 matched_images += 1
-                                print(f"[Image Saved] {image_filename} for Inspection #{norm_id}")
-                                break
-                        break
+                                print(f"[Image Saved] {image_filename} for Inspection #{target_inspection_id}, Element {element_index}")
+                            break
 
                 if not matched:
                     unmatched_images.append(norm_id)
+                    print(f"[Warning] Could not match image at row {row} to element")
 
             except Exception as e:  # noqa: BLE001 — intentional to keep pipeline resilient
                 import traceback
@@ -236,7 +243,7 @@ if __name__ == "__main__":
         print("[Step 5] Extracting embedded images using xlwings...")
 
         matched_images, unmatched_images, errors = extract_images_and_update_json(
-            input_file, inspections
+            input_file, inspections, row_map
         )
 
         print("[Step 6] Image extraction complete. Saving updated JSON...")
