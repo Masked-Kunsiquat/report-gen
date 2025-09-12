@@ -4,7 +4,7 @@ This project automates the transformation of audit data exported from Excel into
 
 ---
 
-## Current Module: `extractor.py`
+## Current Module: `extract.py`
 
 ### Responsibilities:
 - Load `audit_data.xlsx` and access the `Raw Data` sheet.
@@ -75,6 +75,6 @@ This project automates the transformation of audit data exported from Excel into
 ## Getting Started
 
 1. Place `audit_data.xlsx` in the working directory.
-2. Run `extractor.py` to generate `inspection_summary.json` and extract images.
+2. Run `extract.py` to generate `inspection_summary.json` and extract images.
 3. Proceed to PDF generation once JSON is verified.
 
