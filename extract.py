@@ -131,60 +131,81 @@ def load_and_group_inspections(file_path):
     return inspections, row_map, df_complete
 
 def extract_images_and_update_json(excel_path, inspections, row_map, df_complete):
-    wb = xw.Book(excel_path)
-    sheet = wb.sheets['Raw Data']
-    os.makedirs('attachments', exist_ok=True)
+    # Create private Excel app to avoid process leaks
+    app = xw.App(visible=False, add_book=False)
+    wb = None
+    try:
+        wb = app.books.open(excel_path)
+        sheet = wb.sheets['Raw Data']
+        os.makedirs('attachments', exist_ok=True)
 
-    image_index_map = defaultdict(int)
-    unmatched_images = []
-    matched_images = 0
-    errors = 0
+        image_index_map = defaultdict(int)
+        unmatched_images = []
+        matched_images = 0
+        errors = 0
 
-    for pic in sheet.pictures:
-        try:
-            # Estimate row based on image position
-            top = pic.api.Top
-            row = int(top // sheet.range('A1').height) + 1
-            inspection_id_raw = sheet.range(f'A{row}').value
-            norm_id = normalize_inspection_id(inspection_id_raw)
+        # Collect and sort pictures for deterministic assignment
+        pictures_data = []
+        for pic in sheet.pictures:
+            try:
+                # Use TopLeftCell.Row for accurate row detection
+                row = pic.api.TopLeftCell.Row
+                col = pic.api.TopLeftCell.Column
+                inspection_id_raw = sheet.range(f'A{row}').value
+                norm_id = normalize_inspection_id(inspection_id_raw)
+                pictures_data.append((row, col, pic, norm_id))
+            except Exception as e:
+                print(f"[Error] Failed to get position for picture: {e}")
+                errors += 1
 
-            # Retry image copy
-            img = None
-            for attempt in range(3):
-                pic.api.Copy()
-                img = ImageGrab.grabclipboard()
-                if img:
-                    break
+        # Sort by row, then column for deterministic assignment
+        pictures_data.sort(key=lambda x: (x[0], x[1]))
 
-            if img is None:
-                print(f"[Warning] No image found in clipboard for row {row}.")
-                unmatched_images.append(norm_id)
-                continue
+        for row, col, pic, norm_id in pictures_data:
+            try:
+                # Retry image copy
+                img = None
+                for attempt in range(3):
+                    pic.api.Copy()
+                    img = ImageGrab.grabclipboard()
+                    if img:
+                        break
 
-            image_index_map[norm_id] += 1
-            image_filename = f"{norm_id}_img_{image_index_map[norm_id]}.png"
-            image_path = os.path.join('attachments', image_filename)
-            img.save(image_path)
+                if img is None:
+                    print(f"[Warning] No image found in clipboard for row {row}.")
+                    unmatched_images.append(norm_id)
+                    continue
 
-            # Match to correct element in JSON
-            matched = False
-            for inspection in inspections:
-                if inspection['inspection_id'] == norm_id:
-                    for element in inspection['elements']:
-                        if element.get('attachment') is None:
-                            element['attachment'] = image_path.replace("\\", "/")
-                            matched = True
-                            matched_images += 1
-                            print(f"[Image Saved] {image_filename} for Inspection #{norm_id}")
-                            break
-                    break
+                image_index_map[norm_id] += 1
+                image_filename = f"{norm_id}_img_{image_index_map[norm_id]}.png"
+                image_path = os.path.join('attachments', image_filename)
+                img.save(image_path)
 
-            if not matched:
-                unmatched_images.append(norm_id)
+                # Match to next available None attachment within the same inspection
+                matched = False
+                for inspection in inspections:
+                    if inspection['inspection_id'] == norm_id:
+                        for element in inspection['elements']:
+                            if element.get('attachment') is None:
+                                element['attachment'] = image_path.replace("\\", "/")
+                                matched = True
+                                matched_images += 1
+                                print(f"[Image Saved] {image_filename} for Inspection #{norm_id}")
+                                break
+                        break
 
-        except Exception as e:
-            print(f"[Error] Failed to process image: {e}")
-            errors += 1
+                if not matched:
+                    unmatched_images.append(norm_id)
+
+            except Exception as e:
+                print(f"[Error] Failed to process image: {e}")
+                errors += 1
+
+    finally:
+        # Always close workbook and quit app to prevent process leaks
+        if wb:
+            wb.close()
+        app.quit()
 
     return matched_images, unmatched_images, errors
 
