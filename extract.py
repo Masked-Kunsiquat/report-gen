@@ -60,31 +60,48 @@ def load_and_group_inspections(file_path):
         norm_id = normalize_inspection_id(inspection_id)
         first_row = group.iloc[0]
 
+        # Extract and normalize field values to JSON-safe types
+        def get_safe_value(row, key, default=""):
+            value = row.get(key, default)
+            if pd.isna(value):
+                return None
+            # Handle datetime objects
+            if isinstance(value, (pd.Timestamp, np.datetime64)):
+                return pd.Timestamp(value).isoformat()
+            # Handle numpy/pandas scalars
+            if hasattr(value, 'item'):
+                return value.item()
+            return value
+        
+        def get_safe_string(row, key, default=""):
+            value = get_safe_value(row, key, default)
+            return str(value) if value is not None else None
+        
         inspection_data = {
             "inspection_id": norm_id,
-            "corporation": first_row.get("Corporation", ""),
-            "venue": first_row.get("Venue", ""),
-            "building": first_row.get("Building", ""),
-            "scheduled_date": str(first_row.get("Scheduled Date", "")),
-            "creation_date": str(first_row.get("Creation Date", "")),
-            "completion_date": str(first_row.get("Completion Date", "")),
-            "completed_by": first_row.get("Completed By", ""),
-            "overall_comment": first_row.get("Overall Comment", ""),
-            "score_percent": first_row.get("Score in Percent", ""),
-            "alert_type": first_row.get("Alert Type", ""),
+            "corporation": get_safe_string(first_row, "Corporation"),
+            "venue": get_safe_string(first_row, "Venue"),
+            "building": get_safe_string(first_row, "Building"),
+            "scheduled_date": get_safe_string(first_row, "Scheduled Date"),
+            "creation_date": get_safe_string(first_row, "Creation Date"),
+            "completion_date": get_safe_string(first_row, "Completion Date"),
+            "completed_by": get_safe_string(first_row, "Completed By"),
+            "overall_comment": get_safe_string(first_row, "Overall Comment"),
+            "score_percent": get_safe_value(first_row, "Score in Percent"),
+            "alert_type": get_safe_string(first_row, "Alert Type"),
             "elements": []
         }
 
         for idx, row in group.iterrows():
             element_data = {
-                "zone": row.get("Zone", ""),
-                "location": row.get("Location", ""),
-                "element": row.get("Element", ""),
-                "score_factor": row.get("Score Factor", ""),
-                "element_weight_percent": row.get("Element Weight In %", ""),
-                "rating": row.get("Rating", ""),
-                "element_score_percent": row.get("Element Score in %", ""),
-                "comments": row.get("Comments", ""),
+                "zone": get_safe_string(row, "Zone"),
+                "location": get_safe_string(row, "Location"),
+                "element": get_safe_string(row, "Element"),
+                "score_factor": get_safe_value(row, "Score Factor"),
+                "element_weight_percent": get_safe_value(row, "Element Weight In %"),
+                "rating": get_safe_string(row, "Rating"),
+                "element_score_percent": get_safe_value(row, "Element Score in %"),
+                "comments": get_safe_string(row, "Comments"),
                 "attachment": "NaN"
             }
             inspection_data["elements"].append(element_data)
