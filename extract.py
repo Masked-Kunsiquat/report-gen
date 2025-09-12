@@ -75,7 +75,23 @@ def load_and_group_inspections(file_path):
         
         def get_safe_string(row, key, default=""):
             value = get_safe_value(row, key, default)
-            return str(value) if value is not None else None
+            if value is None:
+                return None
+            str_value = str(value).strip()
+            return str_value if str_value else None
+        
+        def get_safe_number(row, key, default=None):
+            value = get_safe_value(row, key, default)
+            if value is None:
+                return None
+            try:
+                # Try to parse as float first, then int if it's a whole number
+                float_val = float(value)
+                if float_val.is_integer():
+                    return int(float_val)
+                return float_val
+            except (ValueError, TypeError):
+                return None
         
         inspection_data = {
             "inspection_id": norm_id,
@@ -97,12 +113,12 @@ def load_and_group_inspections(file_path):
                 "zone": get_safe_string(row, "Zone"),
                 "location": get_safe_string(row, "Location"),
                 "element": get_safe_string(row, "Element"),
-                "score_factor": get_safe_value(row, "Score Factor"),
-                "element_weight_percent": get_safe_value(row, "Element Weight In %"),
+                "score_factor": get_safe_number(row, "Score Factor"),
+                "element_weight_percent": get_safe_number(row, "Element Weight In %"),
                 "rating": get_safe_string(row, "Rating"),
-                "element_score_percent": get_safe_value(row, "Element Score in %"),
+                "element_score_percent": get_safe_number(row, "Element Score in %"),
                 "comments": get_safe_string(row, "Comments"),
-                "attachment": "NaN"
+                "attachment": None
             }
             inspection_data["elements"].append(element_data)
             row_map[norm_id].append(idx)
