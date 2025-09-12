@@ -211,3 +211,14 @@ audit_data.xlsx
 inspection_summary.json
 attachments/
 .claude/
+
+# LaTeX and report generation
+reports/
+*.aux
+*.log
+*.out
+*.toc
+*.pdf
+custom_templates/
+example_reports/
+sample_inspection_data.json

@@ -1,0 +1,230 @@
+% Audit Inspection Summary Template
+% Generated from inspection_summary.json
+\documentclass[11pt,a4paper]{article}
+
+% Packages
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{geometry}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{longtable}
+\usepackage{array}
+\usepackage{xcolor}
+\usepackage{fancyhdr}
+\usepackage{titlesec}
+\usepackage{hyperref}
+\usepackage{textcomp}
+\usepackage{enumitem}
+
+% Page setup
+\geometry{margin=2cm, headheight=1.5cm}
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{\textbf{Audit Inspection Report}}
+\fancyhead[R]{\thepage}
+\fancyfoot[C]{\footnotesize Generated: \today}
+
+% Colors
+\definecolor{headerblue}{RGB}{41, 98, 167}
+\definecolor{lightgray}{RGB}{248, 249, 250}
+\definecolor{darkgray}{RGB}{108, 117, 125}
+
+% Custom commands
+\newcommand{\sectionheader}[1]{%
+    \vspace{12pt}%
+    {\Large\bfseries\color{headerblue}#1}%
+    \vspace{6pt}%
+    \hrule height 1pt%
+    \vspace{12pt}%
+}
+
+\newcommand{\subsectionheader}[1]{%
+    \vspace{8pt}%
+    {\large\bfseries\color{darkgray}#1}%
+    \vspace{4pt}%
+}
+
+\newcommand{\fieldlabel}[1]{\textbf{#1:}}
+\newcommand{\fieldvalue}[1]{\textcolor{darkgray}{#1}}
+
+% Score colors based on percentage
+\newcommand{\scorecolor}[1]{%
+    \ifnum #1<50
+        \textcolor{red}{#1\%}%
+    \else\ifnum #1<75
+        \textcolor{orange}{#1\%}%
+    \else
+        \textcolor{green}{#1\%}%
+    \fi\fi
+}
+
+% Alert type styling
+\newcommand{\alerttype}[1]{%
+    \textcolor{red}{\textbf{#1}}%
+}
+
+\begin{document}
+
+% Title page
+\begin{titlepage}
+    \centering
+    \vspace*{2cm}
+    
+    {\Huge\bfseries\color{headerblue}Audit Inspection Report}
+    
+    \vspace{1cm}
+    {\Large Inspection ID: {{INSPECTION_ID}}}
+    
+    \vspace{2cm}
+    \begin{tabular}{@{}ll@{}}
+        \fieldlabel{Corporation} & \fieldvalue{{{CORPORATION}}} \\[8pt]
+        \fieldlabel{Venue} & \fieldvalue{{{VENUE}}} \\[8pt]
+        \fieldlabel{Building} & \fieldvalue{{{BUILDING}}} \\[8pt]
+        \fieldlabel{Inspector} & \fieldvalue{{{COMPLETED_BY}}} \\[8pt]
+        \fieldlabel{Completion Date} & \fieldvalue{{{COMPLETION_DATE}}} \\[8pt]
+    \end{tabular}
+    
+    \vspace{3cm}
+    
+    % Overall Score (if available)
+    {{#if SCORE_PERCENT}}
+    \begin{center}
+        \fbox{\begin{minipage}{6cm}
+            \centering
+            \large\fieldlabel{Overall Score} \\[8pt]
+            {\Huge\scorecolor{{{SCORE_PERCENT}}}}
+        \end{minipage}}
+    \end{center}
+    {{/if}}
+    
+    % Alert Type (if critical)
+    {{#if ALERT_TYPE}}
+    \vspace{1cm}
+    \begin{center}
+        \fbox{\begin{minipage}{8cm}
+            \centering
+            \fieldlabel{Alert Type} \\[4pt]
+            {\large\alerttype{{{ALERT_TYPE}}}}
+        \end{minipage}}
+    \end{center}
+    {{/if}}
+    
+    \vfill
+    {\footnotesize Report generated on \today}
+\end{titlepage}
+
+\newpage
+
+% Inspection Overview
+\sectionheader{Inspection Overview}
+
+\begin{tabular}{@{}p{4cm}p{10cm}@{}}
+    \fieldlabel{Inspection ID} & \fieldvalue{{{INSPECTION_ID}}} \\[6pt]
+    \fieldlabel{Corporation} & \fieldvalue{{{CORPORATION}}} \\[6pt]
+    \fieldlabel{Venue} & \fieldvalue{{{VENUE}}} \\[6pt]
+    \fieldlabel{Building} & \fieldvalue{{{BUILDING}}} \\[6pt]
+    \fieldlabel{Scheduled Date} & \fieldvalue{{{SCHEDULED_DATE}}} \\[6pt]
+    \fieldlabel{Creation Date} & \fieldvalue{{{CREATION_DATE}}} \\[6pt]
+    \fieldlabel{Completion Date} & \fieldvalue{{{COMPLETION_DATE}}} \\[6pt]
+    \fieldlabel{Completed By} & \fieldvalue{{{COMPLETED_BY}}} \\[6pt]
+    {{#if SCORE_PERCENT}}
+    \fieldlabel{Overall Score} & \scorecolor{{{SCORE_PERCENT}}} \\[6pt]
+    {{/if}}
+    {{#if ALERT_TYPE}}
+    \fieldlabel{Alert Type} & \alerttype{{{ALERT_TYPE}}} \\[6pt]
+    {{/if}}
+\end{tabular}
+
+{{#if OVERALL_COMMENT}}
+\subsectionheader{Overall Comments}
+\begin{quote}
+    \textit{{{OVERALL_COMMENT}}}
+\end{quote}
+{{/if}}
+
+\newpage
+
+% Elements Section
+\sectionheader{Inspection Elements}
+
+{{#each ELEMENTS}}
+\subsectionheader{Element {{@index_plus_1}}: {{element}}}
+
+\begin{tabular}{@{}p{4cm}p{10cm}@{}}
+    {{#if zone}}
+    \fieldlabel{Zone} & \fieldvalue{{{zone}}} \\[6pt]
+    {{/if}}
+    {{#if location}}
+    \fieldlabel{Location} & \fieldvalue{{{location}}} \\[6pt]
+    {{/if}}
+    \fieldlabel{Element} & \fieldvalue{{{element}}} \\[6pt]
+    {{#if score_factor}}
+    \fieldlabel{Score Factor} & \fieldvalue{{{score_factor}}} \\[6pt]
+    {{/if}}
+    {{#if element_weight_percent}}
+    \fieldlabel{Weight} & \fieldvalue{{{element_weight_percent}}\%} \\[6pt]
+    {{/if}}
+    {{#if rating}}
+    \fieldlabel{Rating} & \fieldvalue{{{rating}}} \\[6pt]
+    {{/if}}
+    {{#if element_score_percent}}
+    \fieldlabel{Element Score} & \scorecolor{{{element_score_percent}}} \\[6pt]
+    {{/if}}
+\end{tabular}
+
+{{#if comments}}
+\vspace{8pt}
+\textbf{Comments:}
+\begin{quote}
+    \textit{{{comments}}}
+\end{quote}
+{{/if}}
+
+{{#if attachment}}
+\vspace{8pt}
+\textbf{Attachment:}
+\begin{center}
+    \includegraphics[width=0.8\textwidth,keepaspectratio]{{{attachment}}}
+\end{center}
+{{/if}}
+
+\vspace{12pt}
+\hrule height 0.5pt
+\vspace{12pt}
+
+{{/each}}
+
+% Summary page (if multiple elements)
+{{#if ELEMENTS.length_gt_1}}
+\newpage
+\sectionheader{Summary}
+
+\begin{longtable}{@{}p{2cm}p{4cm}p{2cm}p{2cm}p{4cm}@{}}
+    \toprule
+    \textbf{Zone} & \textbf{Element} & \textbf{Rating} & \textbf{Score} & \textbf{Comments} \\
+    \midrule
+    \endfirsthead
+    
+    \multicolumn{5}{c}{\tablename\ \thetable\ -- \textit{Continued from previous page}} \\
+    \toprule
+    \textbf{Zone} & \textbf{Element} & \textbf{Rating} & \textbf{Score} & \textbf{Comments} \\
+    \midrule
+    \endhead
+    
+    \midrule
+    \multicolumn{5}{r}{\textit{Continued on next page}} \\
+    \endfoot
+    
+    \bottomrule
+    \endlastfoot
+    
+    {{#each ELEMENTS}}
+    {{zone}} & {{element}} & {{rating}} & 
+    {{#if element_score_percent}}\scorecolor{{{element_score_percent}}}{{else}}--{{/if}} & 
+    {{#truncate comments 50}}{{/truncate}} \\
+    {{/each}}
+\end{longtable}
+{{/if}}
+
+\end{document}
