@@ -210,3 +210,4 @@ __marimo__/
 audit_data.xlsx
 inspection_summary.json
 attachments/
+.claude/
