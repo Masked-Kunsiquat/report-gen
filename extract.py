@@ -4,6 +4,42 @@ import os
 import xlwings as xw
 from PIL import ImageGrab
 from collections import defaultdict
+import numpy as np
+from datetime import datetime
+
+def sanitize_for_json(obj):
+    """Convert non-JSON-serializable objects to JSON-safe primitives."""
+    if obj is None:
+        return None
+    
+    # Handle pandas NaT and numpy NaN
+    if pd.isna(obj):
+        return None
+    
+    # Handle numpy scalars
+    if isinstance(obj, (np.integer, np.int64, np.int32)):
+        return int(obj)
+    if isinstance(obj, (np.floating, np.float64, np.float32)):
+        return float(obj)
+    if isinstance(obj, np.bool_):
+        return bool(obj)
+    
+    # Handle datetime objects
+    if isinstance(obj, (pd.Timestamp, np.datetime64)):
+        if pd.isna(obj):
+            return None
+        return pd.Timestamp(obj).isoformat()
+    if isinstance(obj, datetime):
+        return obj.isoformat()
+    
+    # Handle collections recursively
+    if isinstance(obj, dict):
+        return {key: sanitize_for_json(value) for key, value in obj.items()}
+    if isinstance(obj, (list, tuple)):
+        return [sanitize_for_json(item) for item in obj]
+    
+    # Return primitive types as-is
+    return obj
 
 def normalize_inspection_id(value):
     """Convert float-like inspection IDs to clean strings."""
@@ -56,6 +92,9 @@ def load_and_group_inspections(file_path):
 
         inspections.append(inspection_data)
 
+    # Sanitize all inspection data for JSON serialization
+    inspections = sanitize_for_json(inspections)
+    
     return inspections, row_map, df_complete
 
 def extract_images_and_update_json(excel_path, inspections, row_map, df_complete):
