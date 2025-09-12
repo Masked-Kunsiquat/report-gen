@@ -50,8 +50,8 @@ def normalize_inspection_id(value):
 
 def load_and_group_inspections(file_path):
     df = pd.read_excel(file_path, sheet_name='Raw Data', engine='openpyxl')
-    df_complete = df[df['Status'].str.lower() == 'complete']
-    grouped = df_complete.groupby('Inspection #')
+    df_complete = df[df['Status'].fillna('').str.strip().str.lower() == 'complete']
+    grouped = df_complete.groupby('Inspection #', sort=False)
 
     inspections = []
     row_map = defaultdict(list)  # Maps inspection_id to row indices
