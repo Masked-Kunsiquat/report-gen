@@ -171,7 +171,7 @@ def extract_images_and_update_json(excel_path, inspections, row_map, df_complete
             for inspection in inspections:
                 if inspection['inspection_id'] == norm_id:
                     for element in inspection['elements']:
-                        if element['attachment'] == "NaN":
+                        if element.get('attachment') is None:
                             element['attachment'] = image_path.replace("\\", "/")
                             matched = True
                             matched_images += 1
