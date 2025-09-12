@@ -6,7 +6,7 @@ This project automates the transformation of audit data exported from Excel into
 
 ## Current Module: `extract.py`
 
-### Responsibilities:
+### Responsibilities
 - Load `audit_data.xlsx` and access the `Raw Data` sheet.
 - Filter rows where `Status == "Complete"`.
 - Group rows by `Inspection #`.
@@ -18,7 +18,7 @@ This project automates the transformation of audit data exported from Excel into
 - Update `inspection_summary.json` with image paths.
 - Print progress and summary report.
 
-### Progress Reporting:
+### Progress Reporting
 - Each step emits structured progress messages to stdout.
 - Summary includes:
   - Total inspections parsed
@@ -30,16 +30,16 @@ This project automates the transformation of audit data exported from Excel into
 
 ## Raw Data Sheet Structure
 
-### Primary Grouping:
+### Primary Grouping
 - `Inspection #`: Unique identifier for each inspection.
 
-### Global Metadata:
+### Global Metadata
 - `Corporation`, `Venue`, `Building`
 - `Scheduled Date`, `Creation Date`, `Completion Date`
 - `Completed By`, `Status`, `Overall Comment`, `Score in Percent`
 - `Alert Type`
 
-### Element-Level Details:
+### Element-Level Details
 - `Zone`, `Location`, `Element`
 - `Score Factor`, `Element Weight In %`, `Rating`, `Element Score in %`
 - `Comments`, `Attachment` (embedded image)
@@ -73,6 +73,11 @@ This project automates the transformation of audit data exported from Excel into
 ---
 
 ## Getting Started
+
+### Prerequisites
+- Microsoft Excel installed (Windows/macOS).
+- xlwings has access to Excel (not supported headless/on Linux without Excel).
+- PIL.ImageGrab requires a GUI clipboard.
 
 1. Place `audit_data.xlsx` in the working directory.
 2. Run `extract.py` to generate `inspection_summary.json` and extract images.
