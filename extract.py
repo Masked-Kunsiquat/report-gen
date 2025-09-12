@@ -127,7 +127,7 @@ def load_and_group_inspections(file_path):
                 "element_weight_percent": get_safe_number(row, "Element Weight In %"),
                 "rating": get_safe_string(row, "Rating"),
                 "element_score_percent": get_safe_number(row, "Element Score in %"),
-                "comments": get_safe_string(row, "Comments"),
+                "comments": get_safe_string(row, "Comment"),
                 "attachment": None
             }
             inspection_data["elements"].append(element_data)
