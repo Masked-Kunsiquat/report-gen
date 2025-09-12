@@ -1,0 +1,125 @@
+% Flat Table Inspection Report Template
+% Matches original PDF format with tabular structure
+\documentclass[10pt,landscape,a4paper]{article}
+
+% Packages for table formatting
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{geometry}
+\usepackage{graphicx}
+\usepackage{longtable}
+\usepackage{array}
+\usepackage{booktabs}
+\usepackage{xcolor}
+\usepackage{colortbl}
+\usepackage{rotating}
+\usepackage{adjustbox}
+
+% Page setup for landscape orientation
+\geometry{margin=1cm, headheight=0.8cm}
+\pagestyle{plain}
+
+% Colors
+\definecolor{headerblue}{RGB}{41, 98, 167}
+\definecolor{lightgray}{RGB}{248, 249, 250}
+\definecolor{darkgray}{RGB}{108, 117, 125}
+
+% Custom column types
+\newcolumntype{L}[1]{>{\raggedright\arraybackslash}p{#1}}
+\newcolumntype{C}[1]{>{\centering\arraybackslash}p{#1}}
+
+\begin{document}
+
+% Title
+\begin{center}
+    {\Large\bfseries\color{headerblue} Inspection Report - Flat Table Format}
+    \vspace{0.5cm}
+\end{center}
+
+% Main data table
+\begin{longtable}{|L{1.2cm}|L{1.5cm}|L{2cm}|L{1.5cm}|L{1.5cm}|L{2.5cm}|L{1.2cm}|L{1.8cm}|L{1.8cm}|L{1.8cm}|L{1.8cm}|L{2cm}|L{1cm}|L{2.5cm}|L{1.5cm}|L{1cm}|L{1cm}|L{1cm}|L{3cm}|L{2cm}|}
+\hline
+\rowcolor{headerblue}
+\textcolor{white}{\textbf{Insp. \#}} & 
+\textcolor{white}{\textbf{Corp.}} & 
+\textcolor{white}{\textbf{Venue}} & 
+\textcolor{white}{\textbf{Building}} & 
+\textcolor{white}{\textbf{Zone}} & 
+\textcolor{white}{\textbf{Location}} & 
+\textcolor{white}{\textbf{Status}} & 
+\textcolor{white}{\textbf{Sched. Date}} & 
+\textcolor{white}{\textbf{Create Date}} & 
+\textcolor{white}{\textbf{Comp. Date}} & 
+\textcolor{white}{\textbf{Comp. By}} & 
+\textcolor{white}{\textbf{Overall Comment}} & 
+\textcolor{white}{\textbf{Score \%}} & 
+\textcolor{white}{\textbf{Element}} & 
+\textcolor{white}{\textbf{Score Factor}} & 
+\textcolor{white}{\textbf{Wt \%}} & 
+\textcolor{white}{\textbf{Rating}} & 
+\textcolor{white}{\textbf{El. Score \%}} & 
+\textcolor{white}{\textbf{Comment}} & 
+\textcolor{white}{\textbf{Attachment}} \\
+\hline
+\endfirsthead
+
+\multicolumn{20}{|c|}{\tablename\ \thetable\ -- \textit{Continued from previous page}} \\
+\hline
+\rowcolor{headerblue}
+\textcolor{white}{\textbf{Insp. \#}} & 
+\textcolor{white}{\textbf{Corp.}} & 
+\textcolor{white}{\textbf{Venue}} & 
+\textcolor{white}{\textbf{Building}} & 
+\textcolor{white}{\textbf{Zone}} & 
+\textcolor{white}{\textbf{Location}} & 
+\textcolor{white}{\textbf{Status}} & 
+\textcolor{white}{\textbf{Sched. Date}} & 
+\textcolor{white}{\textbf{Create Date}} & 
+\textcolor{white}{\textbf{Comp. Date}} & 
+\textcolor{white}{\textbf{Comp. By}} & 
+\textcolor{white}{\textbf{Overall Comment}} & 
+\textcolor{white}{\textbf{Score \%}} & 
+\textcolor{white}{\textbf{Element}} & 
+\textcolor{white}{\textbf{Score Factor}} & 
+\textcolor{white}{\textbf{Wt \%}} & 
+\textcolor{white}{\textbf{Rating}} & 
+\textcolor{white}{\textbf{El. Score \%}} & 
+\textcolor{white}{\textbf{Comment}} & 
+\textcolor{white}{\textbf{Attachment}} \\
+\hline
+\endhead
+
+\hline
+\multicolumn{20}{|r|}{\textit{Continued on next page}} \\
+\endfoot
+
+\hline
+\endlastfoot
+
+{{#each INSPECTION_DATA}}
+{{inspection_number}} & 
+{{corporation}} & 
+{{venue}} & 
+{{building}} & 
+{{zone}} & 
+{{location}} & 
+{{status}} & 
+{{scheduled_date}} & 
+{{creation_date}} & 
+{{completion_date}} & 
+{{completed_by}} & 
+{{overall_comment}} & 
+{{#if score_percent}}{{score_percent}}\%{{/if}} & 
+{{element}} & 
+{{score_factor}} & 
+{{#if element_weight_percent}}{{element_weight_percent}}\%{{/if}} & 
+{{rating}} & 
+{{#if element_score_percent}}{{element_score_percent}}\%{{/if}} & 
+{{comment}} & 
+{{#if attachment}}\adjustbox{width=1.8cm,height=1cm,center}{\includegraphics[keepaspectratio]{{{attachment}}}}{{/if}} \\
+\hline
+{{/each}}
+
+\end{longtable}
+
+\end{document}

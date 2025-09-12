@@ -31,6 +31,63 @@ class LaTeXGenerator:
         self.output_dir = Path(output_dir)
         self.output_dir.mkdir(exist_ok=True)
         
+    def generate_flat_table_report(self, table_data: List[Dict[str, Any]], 
+                                   template_name: str = "flat_table_template.tex") -> Path:
+        """Generate a flat table report from inspection table data."""
+        template = self.load_template(template_name)
+        
+        # Process the flat table data for LaTeX
+        latex_content = self.process_flat_table_template(template, table_data)
+        
+        # Create output filename
+        output_file = self.output_dir / "flat_table_report.tex"
+        
+        # Write LaTeX file
+        with open(output_file, 'w', encoding='utf-8') as f:
+            f.write(latex_content)
+        
+        print(f"Generated flat table report: {output_file}")
+        return output_file
+    
+    def process_flat_table_template(self, template: str, table_data: List[Dict[str, Any]]) -> str:
+        """Process flat table template with table data."""
+        # Process {{#each INSPECTION_DATA}} blocks
+        pattern = r'\{\{#each\s+INSPECTION_DATA\}\}(.*?)\{\{/each\}\}'
+        
+        def replace_data_loop(match):
+            loop_template = match.group(1)
+            result = ""
+            
+            for row in table_data:
+                row_content = loop_template
+                
+                # Replace all row variables and handle conditionals
+                for key, value in row.items():
+                    if value is None:
+                        value = ""
+                    
+                    # Handle special formatting
+                    if isinstance(value, str) and value:
+                        formatted_value = self.sanitize_latex(value)
+                    else:
+                        formatted_value = str(value) if value else ""
+                    
+                    # Replace simple variables
+                    row_content = row_content.replace(f"{{{{{key}}}}}", formatted_value)
+                    
+                    # Handle conditionals for this key
+                    if_pattern = r'\{\{#if\s+' + key + r'\}\}(.*?)\{\{/if\}\}'
+                    def replace_if(match):
+                        if_content = match.group(1)
+                        return if_content if formatted_value and formatted_value.strip() else ""
+                    row_content = re.sub(if_pattern, replace_if, row_content, flags=re.DOTALL)
+                
+                result += row_content
+            
+            return result
+        
+        return re.sub(pattern, replace_data_loop, template, flags=re.DOTALL)
+        
     def load_template(self, template_name: str) -> str:
         """Load LaTeX template from file."""
         template_path = self.template_dir / template_name
@@ -46,20 +103,21 @@ class LaTeXGenerator:
             text = str(text) if text is not None else ""
         
         # LaTeX special characters that need escaping
-        latex_chars = {
-            '&': r'\&',
-            '%': r'\%',
-            '$': r'\$',
-            '#': r'\#',
-            '^': r'\textasciicircum{}',
-            '_': r'\_',
-            '{': r'\{',
-            '}': r'\}',
-            '~': r'\textasciitilde{}',
-            '\\': r'\textbackslash{}',
-        }
+        # Order matters - do backslashes first to avoid double-escaping
+        latex_chars = [
+            ('\\', r'\textbackslash{}'),
+            ('&', r'\&'),
+            ('%', r'\%'),
+            ('$', r'\$'),
+            ('#', r'\#'),
+            ('^', r'\textasciicircum{}'),
+            ('_', r'\_'),
+            ('{', r'\{'),
+            ('}', r'\}'),
+            ('~', r'\textasciitilde{}'),
+        ]
         
-        for char, escaped in latex_chars.items():
+        for char, escaped in latex_chars:
             text = text.replace(char, escaped)
         
         return text
@@ -114,7 +172,7 @@ class LaTeXGenerator:
     def process_conditionals(self, content: str, variables: Dict[str, str]) -> str:
         """Process {{#if VARIABLE}} blocks."""
         # Simple regex for conditional blocks
-        pattern = r'\\{\\{#if\\s+([A-Z_]+)\\}\\}(.*?)\\{\\{/if\\}\\}'
+        pattern = r'\{\{#if\s+([A-Z_]+)\}\}(.*?)\{\{/if\}\}'
         
         def replace_conditional(match):
             var_name = match.group(1)
@@ -129,7 +187,7 @@ class LaTeXGenerator:
     def process_elements_loop(self, content: str, elements: List[Dict[str, Any]]) -> str:
         """Process {{#each ELEMENTS}} blocks."""
         # Find the elements loop
-        pattern = r'\\{\\{#each\\s+ELEMENTS\\}\\}(.*?)\\{\\{/each\\}\\}'
+        pattern = r'\{\{#each\s+ELEMENTS\}\}(.*?)\{\{/each\}\}'
         
         def replace_elements_loop(match):
             loop_template = match.group(1)
@@ -154,7 +212,7 @@ class LaTeXGenerator:
                 
                 # Replace variables
                 for var, value in element_vars.items():
-                    element_content = element_content.replace(f"{{{{{var}}}}}", value)
+                    element_content = element_content.replace(f"{{{{{var}}}}}", value or "")
                 
                 # Process element conditionals
                 element_content = self.process_element_conditionals(element_content, element_vars)
@@ -167,7 +225,7 @@ class LaTeXGenerator:
     
     def process_element_conditionals(self, content: str, element_vars: Dict[str, str]) -> str:
         """Process conditionals within element loops."""
-        pattern = r'\\{\\{#if\\s+([a-zA-Z_@]+)\\}\\}(.*?)\\{\\{/if\\}\\}'
+        pattern = r'\{\{#if\s+([a-zA-Z_@]+)\}\}(.*?)\{\{/if\}\}'
         
         def replace_conditional(match):
             var_name = match.group(1)
@@ -300,18 +358,59 @@ class LaTeXGenerator:
     
     def compile_pdf(self, tex_file: Path) -> Optional[Path]:
         """Compile LaTeX file to PDF using pdflatex."""
-        if not shutil.which('pdflatex'):
-            print("Warning: pdflatex not found. Install LaTeX to compile PDFs.")
+        
+        # Try Python pdflatex package first
+        try:
+            import pdflatex
+            print(f"Using Python pdflatex package to compile {tex_file}")
+            
+            pdftex = pdflatex.PDFLaTeX.from_texfile(str(tex_file))
+            pdf, log, completed_process = pdftex.create_pdf(keep_pdf_file=True, keep_log_file=False)
+            
+            pdf_file = tex_file.with_suffix('.pdf')
+            if pdf_file.exists():
+                print(f"Compiled PDF: {pdf_file}")
+                return pdf_file
+            else:
+                print("PDF compilation succeeded but file not found")
+                return None
+                
+        except ImportError:
+            print("Python pdflatex package not available, trying system pdflatex")
+        except Exception as e:
+            print(f"Python pdflatex compilation failed: {e}")
+        
+        # Fallback to system pdflatex
+        pdflatex_cmd = shutil.which('pdflatex')
+        
+        # Try common MiKTeX locations on Windows
+        if not pdflatex_cmd and os.name == 'nt':
+            import getpass
+            username = getpass.getuser()
+            miktex_paths = [
+                rf"C:\Users\{username}\AppData\Local\Programs\MiKTeX\miktex\bin\x64\pdflatex.exe",
+                r"C:\Program Files\MiKTeX\miktex\bin\x64\pdflatex.exe",
+                r"C:\Program Files (x86)\MiKTeX\miktex\bin\pdflatex.exe",
+            ]
+            for path in miktex_paths:
+                if os.path.exists(path):
+                    pdflatex_cmd = path
+                    break
+        
+        if not pdflatex_cmd:
+            print("Warning: Neither Python pdflatex package nor system pdflatex found.")
+            print("Install a LaTeX distribution (MiKTeX/TeX Live) for PDF compilation.")
             return None
         
         try:
+            print(f"Using pdflatex: {pdflatex_cmd}")
             # Run pdflatex twice for proper references
             for _ in range(2):
                 result = subprocess.run([
-                    'pdflatex', 
+                    pdflatex_cmd, 
                     '-interaction=nonstopmode',
                     '-output-directory', str(tex_file.parent),
-                    str(tex_file)
+                    tex_file.name  # Use just filename, not full path
                 ], capture_output=True, text=True, cwd=tex_file.parent)
                 
                 if result.returncode != 0:
@@ -373,7 +472,7 @@ def main():
     # Load inspection data
     try:
         with open(args.input, 'r', encoding='utf-8') as f:
-            inspections = json.load(f)
+            data = json.load(f)
     except FileNotFoundError:
         print(f"Error: Input file '{args.input}' not found.")
         return 1
@@ -381,9 +480,20 @@ def main():
         print(f"Error: Invalid JSON in '{args.input}': {e}")
         return 1
     
-    if not inspections:
-        print("No inspections found in input file.")
+    if not data:
+        print("No data found in input file.")
         return 1
+    
+    # Detect data format - flat table vs nested inspections
+    is_flat_table = (isinstance(data, list) and len(data) > 0 and 
+                     'inspection_number' in data[0] and 'element' in data[0])
+    
+    if is_flat_table:
+        print(f"Detected flat table format with {len(data)} rows")
+        inspections = data  # Use data directly for flat table
+    else:
+        print(f"Detected nested inspection format with {len(data)} inspections")
+        inspections = data
     
     # Apply filters
     filters = {}
@@ -401,17 +511,23 @@ def main():
     generator = LaTeXGenerator(output_dir=args.output_dir)
     generated_files = []
     
-    # Generate reports
-    if args.single:
-        print(f"Generating individual reports for {len(inspections)} inspections...")
-        for inspection in inspections:
-            tex_file = generator.generate_single_report(inspection)
-            generated_files.append(tex_file)
-    
-    if args.combined:
-        print("Generating combined report...")
-        tex_file = generator.generate_combined_report(inspections)
+    # Generate reports based on data format
+    if is_flat_table:
+        print("Generating flat table report...")
+        tex_file = generator.generate_flat_table_report(inspections)
         generated_files.append(tex_file)
+    else:
+        # Original nested format logic
+        if args.single:
+            print(f"Generating individual reports for {len(inspections)} inspections...")
+            for inspection in inspections:
+                tex_file = generator.generate_single_report(inspection)
+                generated_files.append(tex_file)
+        
+        if args.combined:
+            print("Generating combined report...")
+            tex_file = generator.generate_combined_report(inspections)
+            generated_files.append(tex_file)
     
     # Compile PDFs if requested
     if args.compile:

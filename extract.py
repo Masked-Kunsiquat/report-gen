@@ -58,91 +58,81 @@ def normalize_inspection_id(value):
     except (ValueError, TypeError):
         return str(value)
 
-def load_and_group_inspections(file_path):
+def load_flat_inspection_data(file_path):
+    """Load inspection data in flat table format matching original PDF structure."""
     df = pd.read_excel(file_path, sheet_name='Raw Data', engine='openpyxl')
     df_complete = df[df['Status'].fillna('').str.strip().str.lower() == 'complete']
-    grouped = df_complete.groupby('Inspection #', sort=False)
-
-    inspections = []
-    row_map = defaultdict(list)  # Maps Excel row number to (inspection_id, element_index)
-
-    for inspection_id, group in grouped:
-        norm_id = normalize_inspection_id(inspection_id)
-        first_row = group.iloc[0]
-
-        # Extract and normalize field values to JSON-safe types
-        def get_safe_value(row, key, default=""):
-            value = row.get(key, default)
-            if pd.isna(value):
-                return None
-            # Handle datetime objects
-            if isinstance(value, (pd.Timestamp, np.datetime64)):
-                return pd.Timestamp(value).isoformat()
-            # Handle numpy/pandas scalars
-            if hasattr(value, 'item'):
-                return value.item()
-            return value
-        
-        def get_safe_string(row, key, default=""):
-            value = get_safe_value(row, key, default)
-            if value is None:
-                return None
-            str_value = str(value).strip()
-            return str_value if str_value else None
-        
-        def get_safe_number(row, key, default=None):
-            value = get_safe_value(row, key, default)
-            if value is None:
-                return None
-            try:
-                # Try to parse as float first, then int if it's a whole number
-                float_val = float(value)
-                if float_val.is_integer():
-                    return int(float_val)
-                return float_val
-            except (ValueError, TypeError):
-                return None
-        
-        inspection_data = {
-            "inspection_id": norm_id,
-            "corporation": get_safe_string(first_row, "Corporation"),
-            "venue": get_safe_string(first_row, "Venue"),
-            "building": get_safe_string(first_row, "Building"),
-            "scheduled_date": get_safe_string(first_row, "Scheduled Date"),
-            "creation_date": get_safe_string(first_row, "Creation Date"),
-            "completion_date": get_safe_string(first_row, "Completion Date"),
-            "completed_by": get_safe_string(first_row, "Completed By"),
-            "overall_comment": get_safe_string(first_row, "Overall Comment"),
-            "score_percent": get_safe_value(first_row, "Score In %"),
-            "alert_type": get_safe_string(first_row, "Alert Type"),
-            "elements": []
-        }
-
-        for element_idx, (idx, row) in enumerate(group.iterrows()):
-            element_data = {
-                "zone": get_safe_string(row, "Zone"),
-                "location": get_safe_string(row, "Location"),
-                "element": get_safe_string(row, "Element"),
-                "score_factor": get_safe_number(row, "Score Factor"),
-                "element_weight_percent": get_safe_number(row, "Element Weight In %"),
-                "rating": get_safe_string(row, "Rating"),
-                "element_score_percent": get_safe_number(row, "Element Score In %"),
-                "comments": get_safe_string(row, "Comment"),
-                "attachment": None
-            }
-            inspection_data["elements"].append(element_data)
-            # Map Excel row number (1-based) to (inspection_id, element_index)
-            excel_row = idx + 2  # Convert 0-based pandas index to 1-based Excel row (assuming header row)
-            row_map[excel_row] = (norm_id, element_idx)
-
-        inspections.append(inspection_data)
-
-    # Return row_map as a simple dict (not defaultdict) for JSON serialization safety
-    clean_row_map = dict(row_map)
     
-    return inspections, clean_row_map, df_complete
+    # Helper functions for data cleaning
+    def get_safe_value(row, key, default=""):
+        value = row.get(key, default)
+        if pd.isna(value):
+            return None
+        # Handle datetime objects
+        if isinstance(value, (pd.Timestamp, np.datetime64)):
+            return pd.Timestamp(value).isoformat()
+        # Handle numpy/pandas scalars
+        if hasattr(value, 'item'):
+            return value.item()
+        return value
+    
+    def get_safe_string(row, key, default=""):
+        value = get_safe_value(row, key, default)
+        if value is None:
+            return ""
+        str_value = str(value).strip()
+        return str_value if str_value else ""
+    
+    def get_safe_number(row, key, default=None):
+        value = get_safe_value(row, key, default)
+        if value is None:
+            return ""
+        try:
+            # Try to parse as float first, then int if it's a whole number
+            float_val = float(value)
+            if float_val.is_integer():
+                return int(float_val)
+            return float_val
+        except (ValueError, TypeError):
+            return ""
 
-def extract_images_and_update_json(excel_path, inspections, row_map):
+    # Create flat table structure - one row per element
+    table_rows = []
+    row_map = {}  # Maps Excel row to table row index for image assignment
+    
+    for idx, row in df_complete.iterrows():
+        # Create flat row matching original PDF columns exactly
+        table_row = {
+            "inspection_number": normalize_inspection_id(row.get("Inspection #", "")),
+            "corporation": get_safe_string(row, "Corporation"),
+            "venue": get_safe_string(row, "Venue"), 
+            "building": get_safe_string(row, "Building"),
+            "zone": get_safe_string(row, "Zone"),
+            "location": get_safe_string(row, "Location"),
+            "status": get_safe_string(row, "Status"),
+            "scheduled_date": get_safe_string(row, "Scheduled Date"),
+            "creation_date": get_safe_string(row, "Creation Date"),
+            "completion_date": get_safe_string(row, "Completion Date"),
+            "completed_by": get_safe_string(row, "Completed By"),
+            "overall_comment": get_safe_string(row, "Overall Comment"),
+            "score_percent": get_safe_number(row, "Score In %"),
+            "element": get_safe_string(row, "Element"),
+            "score_factor": get_safe_string(row, "Score Factor"),
+            "element_weight_percent": get_safe_number(row, "Element Weight In %"),
+            "rating": get_safe_string(row, "Rating"),
+            "element_score_percent": get_safe_number(row, "Element Score In %"),
+            "comment": get_safe_string(row, "Comment"),
+            "attachment": ""  # Will be populated by image extraction
+        }
+        
+        table_rows.append(table_row)
+        # Map Excel row number (1-based) to table row index
+        excel_row = idx + 2  # Convert 0-based pandas index to 1-based Excel row
+        row_map[excel_row] = len(table_rows) - 1
+    
+    return table_rows, row_map
+
+def extract_images_and_update_table(excel_path, table_rows, row_map):
     # Create private Excel app to avoid process leaks
     app = xw.App(visible=False, add_book=False)
     wb = None
@@ -195,23 +185,19 @@ def extract_images_and_update_json(excel_path, inspections, row_map):
                 image_path = os.path.join('attachments', image_filename)
                 img.save(image_path)
 
-                # Match to specific element using exact Excel row
+                # Match to specific table row using exact Excel row
                 matched = False
                 if row in row_map:
-                    target_inspection_id, element_index = row_map[row]
-                    # Find the target inspection
-                    for inspection in inspections:
-                        if inspection['inspection_id'] == target_inspection_id:
-                            if element_index < len(inspection['elements']):
-                                inspection['elements'][element_index]['attachment'] = image_path.replace("\\", "/")
-                                matched = True
-                                matched_images += 1
-                                print(f"[Image Saved] {image_filename} for Inspection #{target_inspection_id}, Element {element_index}")
-                            break
+                    table_row_index = row_map[row]
+                    if table_row_index < len(table_rows):
+                        table_rows[table_row_index]['attachment'] = image_path.replace("\\", "/")
+                        matched = True
+                        matched_images += 1
+                        print(f"[Image Saved] {image_filename} for row {table_row_index} (Excel row {row})")
 
                 if not matched:
                     unmatched_images.append(norm_id)
-                    print(f"[Warning] Could not match image at row {row} to element")
+                    print(f"[Warning] Could not match image at Excel row {row} to table row")
 
             except Exception as e:  # noqa: BLE001 — intentional to keep pipeline resilient
                 import traceback
@@ -229,30 +215,28 @@ def extract_images_and_update_json(excel_path, inspections, row_map):
 
 if __name__ == "__main__":
     input_file = "audit_data.xlsx"
-    output_file = "inspection_summary.json"
+    output_file = "inspection_table.json"  # Changed to reflect flat table structure
 
     try:
-        print("[Step 1] Loading and grouping inspections...")
-        inspections, row_map, df_complete = load_and_group_inspections(input_file)
-        print(f"[Step 2] Found {len(df_complete)} 'Complete' rows.")
-        print(f"[Step 3] Grouped into {len(inspections)} inspections.")
-        print("[Step 4] Initial JSON structure created.")
-        print("[Step 5] Extracting embedded images using xlwings...")
+        print("[Step 1] Loading inspection data in flat table format...")
+        table_rows, row_map = load_flat_inspection_data(input_file)
+        print(f"[Step 2] Found {len(table_rows)} inspection elements.")
+        print("[Step 3] Extracting embedded images using xlwings...")
 
-        matched_images, unmatched_images, errors = extract_images_and_update_json(
-            input_file, inspections, row_map
+        matched_images, unmatched_images, errors = extract_images_and_update_table(
+            input_file, table_rows, row_map
         )
 
-        print("[Step 6] Image extraction complete. Sanitizing data for JSON...")
-        # Sanitize all inspection data for JSON serialization AFTER image processing
-        inspections = sanitize_for_json(inspections)
+        print("[Step 4] Image extraction complete. Sanitizing data for JSON...")
+        # Sanitize all table data for JSON serialization AFTER image processing
+        table_rows = sanitize_for_json(table_rows)
         
         with open(output_file, "w", encoding="utf-8") as f:
-            json.dump(inspections, f, indent=2, ensure_ascii=False)
+            json.dump(table_rows, f, indent=2, ensure_ascii=False)
 
-        print(f"[Done] Inspection summary saved to '{output_file}'.")
+        print(f"[Done] Inspection table saved to '{output_file}'.")
         print("\n--- Summary Report ---")
-        print(f"Total inspections parsed: {len(inspections)}")
+        print(f"Total table rows parsed: {len(table_rows)}")
         print(f"Images successfully matched and saved: {matched_images}")
         print(f"Unmatched images: {len(unmatched_images)}")
         if unmatched_images:

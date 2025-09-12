@@ -1,3 +1,4 @@
+sample.pdf
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[codz]
@@ -209,6 +210,7 @@ __marimo__/
 # Project-specific files
 audit_data.xlsx
 inspection_summary.json
+inspection_table.json
 attachments/
 .claude/
 
