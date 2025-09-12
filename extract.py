@@ -130,7 +130,7 @@ def load_and_group_inspections(file_path):
     
     return inspections, row_map, df_complete
 
-def extract_images_and_update_json(excel_path, inspections, row_map, df_complete):
+def extract_images_and_update_json(excel_path, inspections):
     # Create private Excel app to avoid process leaks
     app = xw.App(visible=False, add_book=False)
     wb = None
@@ -222,7 +222,7 @@ if __name__ == "__main__":
         print("[Step 5] Extracting embedded images using xlwings...")
 
         matched_images, unmatched_images, errors = extract_images_and_update_json(
-            input_file, inspections, row_map, df_complete
+            input_file, inspections
         )
 
         print("[Step 6] Image extraction complete. Saving updated JSON...")
