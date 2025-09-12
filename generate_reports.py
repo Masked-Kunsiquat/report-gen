@@ -68,7 +68,11 @@ class LaTeXGenerator:
                     
                     # Handle special formatting
                     if isinstance(value, str) and value:
-                        formatted_value = self.sanitize_latex(value)
+                        # Don't escape LaTeX characters in file paths
+                        if key == 'attachment' and value:
+                            formatted_value = value  # Keep file paths as-is
+                        else:
+                            formatted_value = self.sanitize_latex(value)
                     else:
                         formatted_value = str(value) if value else ""
                     

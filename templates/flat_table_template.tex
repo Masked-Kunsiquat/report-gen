@@ -1,6 +1,6 @@
 % Flat Table Inspection Report Template
 % Matches original PDF format with tabular structure
-\documentclass[10pt,landscape,a4paper]{article}
+\documentclass[8pt,landscape,a4paper]{article}
 
 % Packages for table formatting
 \usepackage[utf8]{inputenc}
@@ -15,8 +15,8 @@
 \usepackage{rotating}
 \usepackage{adjustbox}
 
-% Page setup for landscape orientation
-\geometry{margin=1cm, headheight=0.8cm}
+% Page setup for landscape orientation with minimal margins
+\geometry{margin=0.5cm, headheight=0.8cm}
 \pagestyle{plain}
 
 % Colors
@@ -36,56 +36,56 @@
     \vspace{0.5cm}
 \end{center}
 
-% Main data table
-\begin{longtable}{|L{1.2cm}|L{1.5cm}|L{2cm}|L{1.5cm}|L{1.5cm}|L{2.5cm}|L{1.2cm}|L{1.8cm}|L{1.8cm}|L{1.8cm}|L{1.8cm}|L{2cm}|L{1cm}|L{2.5cm}|L{1.5cm}|L{1cm}|L{1cm}|L{1cm}|L{3cm}|L{2cm}|}
+% Main data table with optimized column widths for landscape A4
+\begin{longtable}{|L{0.8cm}|L{0.8cm}|L{1.8cm}|L{1.2cm}|L{1cm}|L{2cm}|L{0.8cm}|L{1.2cm}|L{1.2cm}|L{1.2cm}|L{1.2cm}|L{1.5cm}|L{0.6cm}|L{1.8cm}|L{0.8cm}|L{0.6cm}|L{0.6cm}|L{0.6cm}|L{2.2cm}|L{1.5cm}|}
 \hline
 \rowcolor{headerblue}
-\textcolor{white}{\textbf{Insp. \#}} & 
-\textcolor{white}{\textbf{Corp.}} & 
-\textcolor{white}{\textbf{Venue}} & 
-\textcolor{white}{\textbf{Building}} & 
-\textcolor{white}{\textbf{Zone}} & 
-\textcolor{white}{\textbf{Location}} & 
-\textcolor{white}{\textbf{Status}} & 
-\textcolor{white}{\textbf{Sched. Date}} & 
-\textcolor{white}{\textbf{Create Date}} & 
-\textcolor{white}{\textbf{Comp. Date}} & 
-\textcolor{white}{\textbf{Comp. By}} & 
-\textcolor{white}{\textbf{Overall Comment}} & 
-\textcolor{white}{\textbf{Score \%}} & 
-\textcolor{white}{\textbf{Element}} & 
-\textcolor{white}{\textbf{Score Factor}} & 
-\textcolor{white}{\textbf{Wt \%}} & 
-\textcolor{white}{\textbf{Rating}} & 
-\textcolor{white}{\textbf{El. Score \%}} & 
-\textcolor{white}{\textbf{Comment}} & 
-\textcolor{white}{\textbf{Attachment}} \\
+\textcolor{white}{\tiny\textbf{ID}} & 
+\textcolor{white}{\tiny\textbf{Corp}} & 
+\textcolor{white}{\tiny\textbf{Venue}} & 
+\textcolor{white}{\tiny\textbf{Building}} & 
+\textcolor{white}{\tiny\textbf{Zone}} & 
+\textcolor{white}{\tiny\textbf{Location}} & 
+\textcolor{white}{\tiny\textbf{Status}} & 
+\textcolor{white}{\tiny\textbf{Sched}} & 
+\textcolor{white}{\tiny\textbf{Created}} & 
+\textcolor{white}{\tiny\textbf{Completed}} & 
+\textcolor{white}{\tiny\textbf{By}} & 
+\textcolor{white}{\tiny\textbf{Comment}} & 
+\textcolor{white}{\tiny\textbf{Score}} & 
+\textcolor{white}{\tiny\textbf{Element}} & 
+\textcolor{white}{\tiny\textbf{Factor}} & 
+\textcolor{white}{\tiny\textbf{Wt}} & 
+\textcolor{white}{\tiny\textbf{Rating}} & 
+\textcolor{white}{\tiny\textbf{ElScore}} & 
+\textcolor{white}{\tiny\textbf{Notes}} & 
+\textcolor{white}{\tiny\textbf{Image}} \\
 \hline
 \endfirsthead
 
 \multicolumn{20}{|c|}{\tablename\ \thetable\ -- \textit{Continued from previous page}} \\
 \hline
 \rowcolor{headerblue}
-\textcolor{white}{\textbf{Insp. \#}} & 
-\textcolor{white}{\textbf{Corp.}} & 
-\textcolor{white}{\textbf{Venue}} & 
-\textcolor{white}{\textbf{Building}} & 
-\textcolor{white}{\textbf{Zone}} & 
-\textcolor{white}{\textbf{Location}} & 
-\textcolor{white}{\textbf{Status}} & 
-\textcolor{white}{\textbf{Sched. Date}} & 
-\textcolor{white}{\textbf{Create Date}} & 
-\textcolor{white}{\textbf{Comp. Date}} & 
-\textcolor{white}{\textbf{Comp. By}} & 
-\textcolor{white}{\textbf{Overall Comment}} & 
-\textcolor{white}{\textbf{Score \%}} & 
-\textcolor{white}{\textbf{Element}} & 
-\textcolor{white}{\textbf{Score Factor}} & 
-\textcolor{white}{\textbf{Wt \%}} & 
-\textcolor{white}{\textbf{Rating}} & 
-\textcolor{white}{\textbf{El. Score \%}} & 
-\textcolor{white}{\textbf{Comment}} & 
-\textcolor{white}{\textbf{Attachment}} \\
+\textcolor{white}{\tiny\textbf{ID}} & 
+\textcolor{white}{\tiny\textbf{Corp}} & 
+\textcolor{white}{\tiny\textbf{Venue}} & 
+\textcolor{white}{\tiny\textbf{Building}} & 
+\textcolor{white}{\tiny\textbf{Zone}} & 
+\textcolor{white}{\tiny\textbf{Location}} & 
+\textcolor{white}{\tiny\textbf{Status}} & 
+\textcolor{white}{\tiny\textbf{Sched}} & 
+\textcolor{white}{\tiny\textbf{Created}} & 
+\textcolor{white}{\tiny\textbf{Completed}} & 
+\textcolor{white}{\tiny\textbf{By}} & 
+\textcolor{white}{\tiny\textbf{Comment}} & 
+\textcolor{white}{\tiny\textbf{Score}} & 
+\textcolor{white}{\tiny\textbf{Element}} & 
+\textcolor{white}{\tiny\textbf{Factor}} & 
+\textcolor{white}{\tiny\textbf{Wt}} & 
+\textcolor{white}{\tiny\textbf{Rating}} & 
+\textcolor{white}{\tiny\textbf{ElScore}} & 
+\textcolor{white}{\tiny\textbf{Notes}} & 
+\textcolor{white}{\tiny\textbf{Image}} \\
 \hline
 \endhead
 
@@ -97,26 +97,26 @@
 \endlastfoot
 
 {{#each INSPECTION_DATA}}
-{{inspection_number}} & 
-{{corporation}} & 
-{{venue}} & 
-{{building}} & 
-{{zone}} & 
-{{location}} & 
-{{status}} & 
-{{scheduled_date}} & 
-{{creation_date}} & 
-{{completion_date}} & 
-{{completed_by}} & 
-{{overall_comment}} & 
-{{#if score_percent}}{{score_percent}}\%{{/if}} & 
-{{element}} & 
-{{score_factor}} & 
-{{#if element_weight_percent}}{{element_weight_percent}}\%{{/if}} & 
-{{rating}} & 
-{{#if element_score_percent}}{{element_score_percent}}\%{{/if}} & 
-{{comment}} & 
-{{#if attachment}}\adjustbox{width=1.8cm,height=1cm,center}{\includegraphics[keepaspectratio]{{{attachment}}}}{{/if}} \\
+\tiny {{inspection_number}} & 
+\tiny {{corporation}} & 
+\tiny {{venue}} & 
+\tiny {{building}} & 
+\tiny {{zone}} & 
+\tiny {{location}} & 
+\tiny {{status}} & 
+\tiny {{scheduled_date}} & 
+\tiny {{creation_date}} & 
+\tiny {{completion_date}} & 
+\tiny {{completed_by}} & 
+\tiny {{overall_comment}} & 
+\tiny {{#if score_percent}}{{score_percent}}\%{{/if}} & 
+\tiny {{element}} & 
+\tiny {{score_factor}} & 
+\tiny {{#if element_weight_percent}}{{element_weight_percent}}\%{{/if}} & 
+\tiny {{rating}} & 
+\tiny {{#if element_score_percent}}{{element_score_percent}}\%{{/if}} & 
+\tiny {{comment}} & 
+{{#if attachment}}\adjustbox{width=1.3cm,height=0.8cm,center}{\includegraphics[keepaspectratio]{{{attachment}}}}{{/if}} \\
 \hline
 {{/each}}
 
