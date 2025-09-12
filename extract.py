@@ -154,8 +154,10 @@ def extract_images_and_update_json(excel_path, inspections):
                 inspection_id_raw = sheet.range(f'A{row}').value
                 norm_id = normalize_inspection_id(inspection_id_raw)
                 pictures_data.append((row, col, pic, norm_id))
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001 — intentional to keep pipeline resilient
+                import traceback
                 print(f"[Error] Failed to get position for picture: {e}")
+                traceback.print_exc()
                 errors += 1
 
         # Sort by row, then column for deterministic assignment
@@ -197,8 +199,10 @@ def extract_images_and_update_json(excel_path, inspections):
                 if not matched:
                     unmatched_images.append(norm_id)
 
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001 — intentional to keep pipeline resilient
+                import traceback
                 print(f"[Error] Failed to process image: {e}")
+                traceback.print_exc()
                 errors += 1
 
     finally:
@@ -240,5 +244,7 @@ if __name__ == "__main__":
 
     except FileNotFoundError:
         print(f"[Error] File '{input_file}' not found.")
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 — intentional to keep CLI resilient
+        import traceback
         print(f"[Error] An unexpected error occurred: {e}")
+        traceback.print_exc()
