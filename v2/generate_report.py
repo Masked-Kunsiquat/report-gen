@@ -35,34 +35,24 @@ def load_inspections(file_path: str) -> tuple[pd.DataFrame, dict]:
 
 def parse_location(location: str) -> tuple[str, str, str]:
     """
-    Parse location strings into (floor, tenant/area, space_type).
+    Extract the trailing space/room type from a location string.
 
-    Suite numbers encode the floor: the last two digits are the suite,
-    everything before is the floor number.
-      '1920-Dynamic Engineering - Office' → floor='19', area='Dynamic Engineering', space='Office'
-      '900-Conference Center - Break Room' → floor='9',  area='Conference Center',   space='Break Room'
-      '19_Common Areas - Men's RR'        → floor='19', area='Common Areas',         space='Men's RR'
-      '15 Common Areas - Corridor'        → floor='15', area='Common Areas',         space='Corridor'
-      '4-Temple University - Classroom'   → floor='4',  area='Temple University',    space='Classroom'
+    Handles multiple account formats:
+      '1920-Dynamic Engineering - Office'             → space='Office'
+      '15 - Common Areas - Men's RR'                 → space='Men's RR'
+      'L1- DEC_Common Areas_ Pantry-Kitchen-Cafeteria' → space='Pantry-Kitchen-Cafeteria'
+
+    Only the third return value (space) is used downstream; floor and area
+    are kept for signature compatibility but are not populated.
     """
     location = str(location).strip()
-
-    # Split off the trailing space type after the last " - "
-    if " - " in location:
-        prefix, space = location.rsplit(" - ", 1)
-    else:
-        prefix, space = location, ""
-
-    # Match leading number + separator (_  -  or space)
-    m = re.match(r"^(\d+)[_\- ](.+)$", prefix)
-    if m:
-        num, area = m.group(1), m.group(2).strip()
-        # Suite numbers (3+ digits): floor = all digits except the last two
-        floor = num[:-2] if len(num) > 2 else num
-    else:
-        floor, area = "", prefix.strip()
-
-    return floor, area, space.strip()
+    # Try separators in priority order: ' - ' is most common, '_ ' handles
+    # accounts that use underscores (e.g. Jefferson format).
+    for sep in (" - ", "_ "):
+        if sep in location:
+            _, space = location.rsplit(sep, 1)
+            return "", "", space.strip()
+    return "", "", location
 
 
 def drop_image_stubs(df: pd.DataFrame) -> pd.DataFrame:
@@ -119,7 +109,7 @@ def build_summary(df: pd.DataFrame, filters: dict) -> dict:
         .reset_index()
     )
 
-    overall_score = round(per_insp["score"].mean(), 1) if not per_insp.empty else 0
+    overall_score = round(per_insp["score"].mean(), 2) if not per_insp.empty else 0
 
     venue = per_insp["venue_"].iloc[0] if not per_insp.empty else "Unknown Venue"
     building = per_insp["building_"].iloc[0] if not per_insp.empty else ""
@@ -142,7 +132,7 @@ def build_summary(df: pd.DataFrame, filters: dict) -> dict:
     space_scores = (
         per_insp.groupby("_space")["score"]
         .mean()
-        .round(1)
+        .round(2)
         .sort_values(ascending=True)
     )
 
@@ -157,7 +147,7 @@ def build_summary(df: pd.DataFrame, filters: dict) -> dict:
     zone_scores = (
         per_insp_z.groupby("zone")["score"]
         .mean()
-        .round(1)
+        .round(2)
         .sort_values(ascending=True)
     )
 
@@ -340,7 +330,7 @@ def render_bar_chart(scores: pd.Series) -> str:
         bar_w = int(min(score, 100) / 100 * bar_area)
         color = bar_color(score)
         label_esc = html.escape(truncate_label(str(label), label_w))
-        score_txt = f"{score:.1f}%"
+        score_txt = f"{score:.2f}%"
 
         lines.append(
             f'  <text x="4" y="{y + row_h - padding - 3}" '
