@@ -87,12 +87,17 @@ def drop_image_stubs(df: pd.DataFrame) -> pd.DataFrame:
 
     drop_idx = set()
     for _, group in df.groupby(["Inspection #", "Element"], sort=False):
-        comments = group["Comment"].fillna("").tolist()
+        comments = group[comment_col(df)].fillna("").tolist()
         for idx, comment in zip(group.index, comments):
             if is_stub(comment, comments):
                 drop_idx.add(idx)
 
     return df[~df.index.isin(drop_idx)].reset_index(drop=True)
+
+
+def comment_col(df: pd.DataFrame) -> str:
+    """Return whichever comment column name exists in this export."""
+    return "Comments" if "Comments" in df.columns else "Comment"
 
 
 def build_summary(df: pd.DataFrame, filters: dict) -> dict:
@@ -114,7 +119,7 @@ def build_summary(df: pd.DataFrame, filters: dict) -> dict:
         .reset_index()
     )
 
-    overall_score = round(per_insp["score"].mean(), 1)
+    overall_score = round(per_insp["score"].mean(), 1) if not per_insp.empty else 0
 
     venue = per_insp["venue_"].iloc[0] if not per_insp.empty else "Unknown Venue"
     building = per_insp["building_"].iloc[0] if not per_insp.empty else ""
@@ -157,7 +162,9 @@ def build_summary(df: pd.DataFrame, filters: dict) -> dict:
     )
 
     # Work orders: rows that have a Comment
-    work_order_rows = df[df["Comment"].notna() & (df["Comment"].astype(str).str.strip() != "")].copy()
+    _cc = comment_col(df)
+    work_order_rows = df[df[_cc].notna() & (df[_cc].astype(str).str.strip() != "")].copy()
+    work_order_rows = work_order_rows.rename(columns={_cc: "Comment"})
     work_order_rows = drop_image_stubs(work_order_rows)
 
     return {
@@ -249,7 +256,7 @@ tr:nth-child(even) td { background: #F0F3F6; -webkit-print-color-adjust: exact; 
 tr.insp-header td { background: #dde3f0; padding: 6px 10px; border-bottom: 1px solid #b0bdd4; font-weight: 700; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 .insp-id { color: #25408F; margin-right: 10px; }
 .insp-location { color: #25408F; margin-right: 10px; }
-.insp-score { color: #85CF5F; float: right; }
+.insp-score { float: right; }
 .insp-sep { color: #4D5B82; margin: 0 6px; font-weight: 400; }
 .insp-date { color: #4D5B82; font-weight: 400; font-size: 11px; }
 .insp-inspector { color: #4D5B82; font-weight: 400; font-size: 11px; }
@@ -286,12 +293,16 @@ tr.insp-header td { background: #dde3f0; padding: 6px 10px; border-bottom: 1px s
 """
 
 
+def score_color(score: float) -> str:
+    if score >= 85:
+        return "#85CF5F"   # pass
+    if score >= 80:
+        return "#F0B557"   # warning
+    return "#F05773"       # failing
+
+
 def bar_color(score: float) -> str:
-    if score >= 90:
-        return "#85CF5F"   # brand green
-    if score >= 75:
-        return "#F0B557"   # brand amber
-    return "#F05773"       # brand red
+    return score_color(score)
 
 
 CHART_LABEL_W = 210  # shared across all charts so bars align between them
@@ -367,12 +378,16 @@ def render_work_orders(work_rows: pd.DataFrame, insp_scores: dict, insp_meta: di
         element = html.escape(str(row.get("Element", "") or ""))
         comment = html.escape(str(row.get("Comment", "") or "").strip())
         rating_raw = row.get("Rating", None)
-        rating = f"{int(rating_raw)}%" if pd.notna(rating_raw) else ""
+        try:
+            rating = f"{int(float(rating_raw))}%" if pd.notna(rating_raw) else ""
+        except (ValueError, TypeError):
+            rating = html.escape(str(rating_raw))
 
         if insp_id != current_insp:
             current_insp = insp_id
             insp_score = insp_scores.get(insp_id, "")
             score_txt = f"{insp_score}%" if insp_score != "" else ""
+            score_color_val = score_color(float(insp_score)) if insp_score != "" else "#4D5B82"
             meta = insp_meta.get(insp_id, {})
             completion_dt = meta.get("completion")
             date_txt = completion_dt.strftime("%m/%d/%Y").lstrip("0").replace("/0", "/") if pd.notna(completion_dt) else ""
@@ -382,7 +397,7 @@ def render_work_orders(work_rows: pd.DataFrame, insp_scores: dict, insp_meta: di
       <td colspan="5">
         <span class="insp-id">#{insp_id}</span>
         <span class="insp-location">{html.escape(location)}</span>
-        <span class="insp-score">{score_txt}</span>
+        <span class="insp-score" style="color:{score_color_val}">{score_txt}</span>
         {f'<span class="insp-sep">·</span><span class="insp-date">{date_txt}</span>' if date_txt else ''}
         {f'<span class="insp-sep">·</span><span class="insp-inspector">{inspector}</span>' if inspector else ''}
       </td>
@@ -432,7 +447,7 @@ def render_html(summary: dict) -> str:
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Facility Quality Control – {venue}</title>
+  <title>Facility Inspection Report – {venue}</title>
   <style>{CSS}</style>
 </head>
 <body>
@@ -454,7 +469,7 @@ def render_html(summary: dict) -> str:
     </div>
     <div class="header-right">
       {COMPANY["logo_tag"]}
-      <div class="report-title">Facility Quality Control</div>
+      <div class="report-title">Facility Inspection Report</div>
     </div>
   </div>
 
