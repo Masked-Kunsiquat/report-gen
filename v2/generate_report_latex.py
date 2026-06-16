@@ -245,22 +245,49 @@ def _bar_color_name(score: float) -> str:
     if score >= 80: return "barambr"
     return "barred"
 
-def render_bar_chart_tex(scores: pd.Series, title: str) -> str:
-    labels = [str(l) for l in scores.index]
-    values = scores.values.tolist()
+def render_bar_chart_tex(scores: pd.Series, title: str, n: int = 5) -> str:
+    n_total = len(scores)
+    if n_total > n:
+        # Top N: best scores descending (best at top)
+        # Bottom N: worst scores reversed (worst at very bottom)
+        top_n    = scores.iloc[-n:][::-1]
+        bot_n    = scores.iloc[:n][::-1]
+        display  = pd.concat([top_n, bot_n])
+        n_hidden = max(0, n_total - n * 2)
+    else:
+        display  = scores[::-1]   # all bars, best at top
+        n_hidden = 0
 
-    label_w = 5.0   # cm reserved for y-axis labels
-    score_w = 1.4   # cm reserved for score text after bar
+    labels = [str(l) for l in display.index]
+    values = display.values.tolist()
+
+    group_w = 0.55  # cm for the Top/Bottom group label column (only when truncated)
+    label_w = 4.5   # cm for bar labels
+    score_w = 1.4   # cm for score text after bar
     row_sep = 0.52  # cm between bar centres
     bar_h   = 0.30  # cm bar height
+    sep_gap = row_sep * 1.6  # extra vertical room for the ellipsis row
+
+    # Total label reservation: add group_w only when showing top/bottom groups
+    total_label_w = label_w + (group_w if n_total > n else 0)
 
     rows = []
     for i, (label, value) in enumerate(zip(labels, values)):
+        in_bottom = n_total > n and i >= n
+        y = -i * row_sep - (sep_gap if in_bottom else 0)
+
+        # Ellipsis separator between top-N and bottom-N groups (only when entries are hidden)
+        if n_hidden > 0 and i == n:
+            sep_y = y + sep_gap * 0.5
+            rows.append(
+                rf"  \node[font=\small\itshape, text=gray!70] at ({{0.5\barw}},{sep_y:.3f}cm)"
+                rf" {{\ldots\ {n_hidden} more\ \ldots}};"
+            )
+
         color = _bar_color_name(value)
-        y = -i * row_sep
-        half = bar_h / 2
-        frac = value / 100.0
-        esc = tex(label)
+        half  = bar_h / 2
+        frac  = value / 100.0
+        esc   = tex(label)
         rows.append(
             rf"  \node[anchor=east,font=\scriptsize,text width={label_w - 0.1:.1f}cm,align=right]"
             rf" at (0,{y:.3f}cm) {{{esc}}};"
@@ -273,14 +300,40 @@ def render_bar_chart_tex(scores: pd.Series, title: str) -> str:
             rf" at ({{{frac:.4f}\barw}},{y:.3f}cm) {{\,{value:.2f}\%}};"
         )
 
-    total_h = (len(labels) - 1) * row_sep + bar_h
+    # Rotated group labels to the left of the bar labels
+    if n_total > n:
+        sep_offset   = sep_gap if n_hidden > 0 else 0
+        group_x      = -(label_w + group_w * 0.5)
+        top_center_y = -(n - 1) / 2.0 * row_sep
+        bot_first_y  = -n * row_sep - sep_offset
+        bot_center_y = bot_first_y - (n - 1) / 2.0 * row_sep
+        rows.append(
+            rf"  \node[rotate=90,anchor=center,font=\footnotesize\bfseries,text=slate]"
+            rf" at ({group_x:.2f}cm,{top_center_y:.3f}cm) {{TOP {n}}};"
+        )
+        rows.append(
+            rf"  \node[rotate=90,anchor=center,font=\footnotesize\bfseries,text=slate]"
+            rf" at ({group_x:.2f}cm,{bot_center_y:.3f}cm) {{BOTTOM {n}}};"
+        )
+
+    n_display = len(labels)
+    extra    = sep_gap if n_total > n else 0
+    top_y    =  bar_h / 2
+    bottom_y = -(n_display - 1) * row_sep - extra - bar_h / 2
+    goal_line = [
+        rf"  \draw[gray!80, dashed, line width=1.0pt]"
+        rf" ({{0.80\barw}},{top_y:.3f}cm) -- ({{0.80\barw}},{bottom_y:.3f}cm);",
+        rf"  \node[above, font=\scriptsize\bfseries, text=gray!80]"
+        rf" at ({{0.80\barw}},{top_y:.3f}cm) {{Goal}};",
+    ]
     return "\n".join([
         r"\noindent\begin{minipage}{\linewidth}",
         rf"\noindent\textbf{{\small\textcolor{{navy}}{{{title}}}}}",
         r"\par\vspace{3pt}",
         r"\noindent\begin{tikzpicture}",
-        rf"  \setlength{{\barw}}{{\dimexpr\linewidth-{label_w:.1f}cm-{score_w:.1f}cm\relax}}",
+        rf"  \setlength{{\barw}}{{\dimexpr\linewidth-{total_label_w:.2f}cm-{score_w:.1f}cm\relax}}",
         *rows,
+        *goal_line,
         r"\end{tikzpicture}",
         r"\end{minipage}",
     ])
