@@ -512,7 +512,7 @@ def build_latex(summary: dict, zone_chart: Path, loc_chart: Path,
 \vspace*{{0.4cm}}
 % Score hero + title row
 \noindent
-\begin{{minipage}}[t]{{0.22\textwidth}}
+\begin{{minipage}}[c]{{0.22\textwidth}}
   \centering
   \colorbox{{navy}}{{\parbox{{\dimexpr\linewidth-2\fboxsep}}{{
     \vspace{{6pt}}
@@ -523,8 +523,7 @@ def build_latex(summary: dict, zone_chart: Path, loc_chart: Path,
   }}}}
 \end{{minipage}}%
 \hfill
-\begin{{minipage}}[t]{{0.74\textwidth}}
-  \vspace{{4pt}}
+\begin{{minipage}}[c]{{0.74\textwidth}}
   {{\large\textbf{{\textcolor{{navy}}{{Facility Inspection Report}}}}}}\\[2pt]
   {{\small\textcolor{{slate}}{{{venue}}}}}\\[1pt]
   {{\small\textcolor{{slate}}{{{date_str}}}}}
