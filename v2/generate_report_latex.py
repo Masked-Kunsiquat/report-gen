@@ -173,7 +173,13 @@ def build_summary(df: pd.DataFrame, filters: dict) -> dict:
     )
     per_insp_z = per_insp.merge(insp_zone, on="Inspection #", how="left")
     zone_scores = per_insp_z.groupby("zone")["score"].mean().round(2).sort_values(ascending=True)
-    element_scores = df.groupby("Element")["Rating"].mean().round(2).sort_values(ascending=True)
+    element_scores = (
+        df.groupby(["Element", "Inspection #"])["Rating"].mean()
+          .groupby("Element").mean()
+          .round(2)
+          .dropna()
+          .sort_values(ascending=True)
+    )
 
     _cc = comment_col(df)
     work_order_rows = df[df[_cc].notna() & (df[_cc].astype(str).str.strip() != "")].copy()
