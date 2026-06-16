@@ -173,6 +173,7 @@ def build_summary(df: pd.DataFrame, filters: dict) -> dict:
     )
     per_insp_z = per_insp.merge(insp_zone, on="Inspection #", how="left")
     zone_scores = per_insp_z.groupby("zone")["score"].mean().round(2).sort_values(ascending=True)
+    element_scores = df.groupby("Element")["Rating"].mean().round(2).sort_values(ascending=True)
 
     _cc = comment_col(df)
     work_order_rows = df[df[_cc].notna() & (df[_cc].astype(str).str.strip() != "")].copy()
@@ -195,6 +196,7 @@ def build_summary(df: pd.DataFrame, filters: dict) -> dict:
         "total_elements": int(df["Element"].nunique()),
         "loc_scores": space_scores,
         "zone_scores": zone_scores,
+        "element_scores": element_scores,
         "work_order_rows": work_order_rows,
         "insp_scores": dict(zip(per_insp["Inspection #"], per_insp["score"])),
         "insp_meta": insp_meta,
@@ -383,7 +385,7 @@ def fwdslash(p) -> str:
     return str(p).replace("\\", "/")
 
 
-def build_latex(summary: dict, zone_chart: str, loc_chart: str,
+def build_latex(summary: dict, zone_chart: str, loc_chart: str, elem_chart: str,
                 insp_images: dict, tmp_dir: Path) -> str:
 
     venue       = tex(summary["venue"])
@@ -599,7 +601,7 @@ def build_latex(summary: dict, zone_chart: str, loc_chart: str,
 \noindent
 {cards}
 
-\vspace{{0.8cm}}
+\newpage
 
 % Charts
 {zone_chart}
@@ -607,7 +609,8 @@ def build_latex(summary: dict, zone_chart: str, loc_chart: str,
 \vspace{{0.5cm}}
 {loc_chart}
 
-\vspace{{0.8cm}}
+\vspace{{0.5cm}}
+{elem_chart}
 
 \newpage
 
@@ -654,11 +657,12 @@ def main():
         tmp_dir = Path(tmp)
 
         print("[3] Rendering charts ...")
-        zone_chart = render_bar_chart_tex(summary["zone_scores"], "Performance Scores by Zone")
-        loc_chart  = render_bar_chart_tex(summary["loc_scores"],  "Performance Scores by Location Type")
+        zone_chart = render_bar_chart_tex(summary["zone_scores"],    "Performance Scores by Zone")
+        loc_chart  = render_bar_chart_tex(summary["loc_scores"],     "Performance Scores by Location Type")
+        elem_chart = render_bar_chart_tex(summary["element_scores"], "Performance Scores by Element")
 
         print("[4] Building LaTeX document ...")
-        latex_src = build_latex(summary, zone_chart, loc_chart, insp_images, tmp_dir)
+        latex_src = build_latex(summary, zone_chart, loc_chart, elem_chart, insp_images, tmp_dir)
 
         tex_file = tmp_dir / "report.tex"
         tex_file.write_text(latex_src, encoding="utf-8")
