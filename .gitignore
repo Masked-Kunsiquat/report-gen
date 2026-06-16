@@ -228,6 +228,7 @@ reports/
 *.out
 *.toc
 *.pdf
+*.tex
 custom_templates/
 example_reports/
 sample_inspection_data.json

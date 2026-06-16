@@ -13,6 +13,8 @@ import re
 import html
 import json
 import base64
+import zipfile
+import xml.etree.ElementTree as ET
 from pathlib import Path
 from collections import defaultdict
 
@@ -30,7 +32,72 @@ def load_inspections(file_path: str) -> tuple[pd.DataFrame, dict]:
     df = pd.read_excel(file_path, sheet_name="Raw Data", engine="openpyxl")
     complete = df[df["Status"].fillna("").str.strip().str.lower() == "complete"].copy()
     complete.reset_index(drop=True, inplace=True)
-    return complete, filters
+    return complete, filters, df
+
+
+def extract_images(file_path: str, df: pd.DataFrame) -> dict[str, list[str]]:
+    """
+    Return {inspection_id: [base64_data_uri, ...]} by reading images directly
+    from the xlsx zip — no Excel or xlwings required.
+
+    Images are anchored to spreadsheet rows via the drawing XML. We map each
+    row back to its Inspection # using the raw dataframe (row offset accounts
+    for the header row).
+    """
+    ns = {
+        "xdr": "http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing",
+        "a":   "http://schemas.openxmlformats.org/drawingml/2006/main",
+        "r":   "http://schemas.openxmlformats.org/officeDocument/2006/relationships",
+    }
+    result: dict[str, list[str]] = defaultdict(list)
+
+    with zipfile.ZipFile(file_path) as z:
+        names = z.namelist()
+        drawing_path = next((n for n in names if n == "xl/drawings/drawing1.xml"), None)
+        rels_path = next((n for n in names if n == "xl/drawings/_rels/drawing1.xml.rels"), None)
+        if not drawing_path or not rels_path:
+            return result
+
+        rels_root = ET.fromstring(z.read(rels_path))
+        rid_to_target = {r.attrib["Id"]: r.attrib["Target"] for r in rels_root}
+
+        drawing_root = ET.fromstring(z.read(drawing_path))
+        for anchor in drawing_root.findall("xdr:twoCellAnchor", ns):
+            row_el = anchor.find("xdr:from/xdr:row", ns)
+            blip = anchor.find(".//xdr:blipFill/a:blip", ns)
+            if row_el is None or blip is None:
+                continue
+
+            # xdr:row=0 is the header row; subtract 1 to get pandas index
+            raw_idx = int(row_el.text) - 1
+            rid = blip.attrib.get("{http://schemas.openxmlformats.org/officeDocument/2006/relationships}embed")
+            if rid is None or raw_idx < 0 or raw_idx >= len(df):
+                continue
+
+            insp_id = str(df.iloc[raw_idx].get("Inspection #", ""))
+            if not insp_id:
+                continue
+
+            # Resolve relative path: "../media/imageN.jpeg" -> "xl/media/imageN.jpeg"
+            img_path = "xl/drawings/" + rid_to_target[rid]
+            img_path = str(Path(img_path).resolve().relative_to(Path(".").resolve()))
+            # Normalise to forward slashes and strip leading separator
+            img_path = img_path.replace("\\", "/").lstrip("/")
+
+            if img_path not in names:
+                # Fallback: just strip the leading ../
+                img_path = rid_to_target[rid].lstrip("../")
+                img_path = "xl/media/" + Path(img_path).name
+
+            if img_path not in names:
+                continue
+
+            ext = Path(img_path).suffix.lstrip(".").lower()
+            mime = {"jpeg": "image/jpeg", "jpg": "image/jpeg", "png": "image/png"}.get(ext, "image/jpeg")
+            data = base64.b64encode(z.read(img_path)).decode()
+            result[insp_id].append(f"data:{mime};base64,{data}")
+
+    return dict(result)
 
 
 def parse_location(location: str) -> tuple[str, str, str]:
@@ -250,6 +317,9 @@ tr.insp-header td { background: #dde3f0; padding: 6px 10px; border-bottom: 1px s
 .insp-sep { color: #4D5B82; margin: 0 6px; font-weight: 400; }
 .insp-date { color: #4D5B82; font-weight: 400; font-size: 11px; }
 .insp-inspector { color: #4D5B82; font-weight: 400; font-size: 11px; }
+tr.insp-photos td { background: #f7f8fc; padding: 8px 10px; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+.insp-photo-strip { display: flex; flex-wrap: wrap; gap: 8px; }
+.insp-photo { height: 120px; width: auto; border-radius: 4px; border: 1px solid #dde3f0; object-fit: cover; }
 .zone-col   { width: 140px; }
 .space-col  { width: 140px; }
 .rating-col { width: 60px; text-align: center; }
@@ -353,7 +423,7 @@ def render_bar_chart(scores: pd.Series) -> str:
     return "\n".join(lines)
 
 
-def render_work_orders(work_rows: pd.DataFrame, insp_scores: dict, insp_meta: dict) -> str:
+def render_work_orders(work_rows: pd.DataFrame, insp_scores: dict, insp_meta: dict, insp_images: dict) -> str:
     if work_rows.empty:
         return "<p><em>No work orders — all areas passed.</em></p>"
 
@@ -391,6 +461,14 @@ def render_work_orders(work_rows: pd.DataFrame, insp_scores: dict, insp_meta: di
         {f'<span class="insp-sep">·</span><span class="insp-date">{date_txt}</span>' if date_txt else ''}
         {f'<span class="insp-sep">·</span><span class="insp-inspector">{inspector}</span>' if inspector else ''}
       </td>
+    </tr>""")
+
+            images = insp_images.get(str(insp_id), [])
+            if images:
+                imgs_html = "".join(f'<img src="{src}" class="insp-photo">' for src in images)
+                rows_html.append(f"""
+    <tr class="insp-photos">
+      <td colspan="5"><div class="insp-photo-strip">{imgs_html}</div></td>
     </tr>""")
 
         rows_html.append(f"""
@@ -431,7 +509,7 @@ def render_html(summary: dict) -> str:
 
     bar_chart = render_bar_chart(loc_scores)
     zone_chart = render_bar_chart(summary["zone_scores"])
-    work_table = render_work_orders(work_rows, summary["insp_scores"], summary["insp_meta"])
+    work_table = render_work_orders(work_rows, summary["insp_scores"], summary["insp_meta"], summary.get("insp_images", {}))
 
     return f"""<!DOCTYPE html>
 <html lang="en">
@@ -524,11 +602,14 @@ def main():
     output_file = sys.argv[2] if len(sys.argv) > 2 else input_file.replace(".xlsx", "_report.html")
 
     print(f"[1] Reading {input_file} ...")
-    df, filters = load_inspections(input_file)
+    df, filters, raw_df = load_inspections(input_file)
     print(f"    {len(df)} complete rows across {df['Inspection #'].nunique()} inspections.")
 
     print("[2] Building summary...")
     summary = build_summary(df, filters)
+    insp_images = extract_images(input_file, raw_df)
+    summary["insp_images"] = insp_images
+    print(f"    Images found: {sum(len(v) for v in insp_images.values())} across {len(insp_images)} inspections.")
     print(f"    Overall score: {summary['overall_score']}%")
     print(f"    Locations: {len(summary['loc_scores'])}")
     print(f"    Work orders: {len(summary['work_order_rows'])}")
