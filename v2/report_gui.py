@@ -14,6 +14,8 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent))
 import generate_report_latex as gen
 
+_company = gen.COMPANY.get("name", "") or "Inspection"
+
 # ---------------------------------------------------------------------------
 # Brand colours
 # ---------------------------------------------------------------------------
@@ -31,7 +33,7 @@ RED   = "#F05773"
 class App(tk.Tk):
     def __init__(self):
         super().__init__()
-        self.title("Company — Report Generator")
+        self.title(f"{_company} — Report Generator")
         self.geometry("700x520")
         self.resizable(False, False)
         self.configure(bg=WHITE)
@@ -46,7 +48,7 @@ class App(tk.Tk):
         hdr = tk.Frame(self, bg=NAVY)
         hdr.pack(fill="x")
         tk.Label(
-            hdr, text="Facility Inspection Report Generator",
+            hdr, text=f"{_company} — Facility Inspection Report Generator",
             font=("Segoe UI", 13, "bold"), fg=WHITE, bg=NAVY, pady=14
         ).pack(side="left", padx=20)
 
