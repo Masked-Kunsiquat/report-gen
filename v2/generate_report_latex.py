@@ -335,6 +335,21 @@ def build_latex(summary: dict, zone_chart: Path, loc_chart: Path,
     logo_path   = COMPANY.get("logo_path", "")
     company_name = tex(COMPANY.get("name", ""))
 
+    thead = (
+        r"\rowcolor{theadrow}"
+        r"\textcolor{white}{\textbf{Zone}} &"
+        r"\textcolor{white}{\textbf{Location Type}} &"
+        r"\textcolor{white}{\textbf{Element}} &"
+        # Merge cols 4+5 into one cell → no inter-column tabcolsep gap to color
+        r"\multicolumn{2}{l}{"
+        r"\makebox[1.5cm][r]{\textcolor{white}{\textbf{Rating}}}"
+        r"\hspace{2\tabcolsep}"
+        r"\textcolor{white}{\textbf{Comments}}"
+        r"} \\\hline"
+        "\n"
+        r"\endhead"
+    )
+
     overall_color = color_cmd(score_color(overall))
 
     # --- Stat cards (4 minipages) ---
@@ -439,7 +454,7 @@ def build_latex(summary: dict, zone_chart: Path, loc_chart: Path,
 \usepackage{{geometry}}
 \usepackage{{xcolor}}
 \usepackage{{graphicx}}
-\usepackage{{longtable}}
+\usepackage{{xltabular}}
 \usepackage{{booktabs}}
 \usepackage{{array}}
 \usepackage{{colortbl}}
@@ -482,11 +497,9 @@ def build_latex(summary: dict, zone_chart: Path, loc_chart: Path,
 
 % ---------- table helpers ----------
 \newcolumntype{{L}}[1]{{>{{\raggedright\arraybackslash}}p{{#1}}}}
-\newcolumntype{{C}}[1]{{>{{\centering\arraybackslash}}p{{#1}}}}
+\newcolumntype{{R}}[1]{{>{{\raggedleft\arraybackslash}}p{{#1}}}}
 \setlength{{\tabcolsep}}{{4pt}}
 \renewcommand{{\arraystretch}}{{1.3}}
-\setlength{{\LTleft}}{{0pt}}
-\setlength{{\LTright}}{{0pt}}
 \setlength{{\arrayrulewidth}}{{0.4pt}}
 
 \begin{{document}}
@@ -541,16 +554,10 @@ def build_latex(summary: dict, zone_chart: Path, loc_chart: Path,
 {{\large\textbf{{\textcolor{{navy}}{{Deficiency Work Orders}}}}}}
 \vspace{{0.3cm}}
 
-\begin{{longtable}}{{L{{2.5cm}} L{{2.5cm}} L{{3cm}} L{{1.5cm}} L{{6.6cm}}}}
-\rowcolor{{theadrow}}
-\textcolor{{white}}{{\textbf{{Zone}}}} &
-\textcolor{{white}}{{\textbf{{Location Type}}}} &
-\textcolor{{white}}{{\textbf{{Element}}}} &
-\textcolor{{white}}{{\textbf{{Rating}}}} &
-\textcolor{{white}}{{\textbf{{Comments}}}} \\\hline
-\endhead
+\begin{{xltabular}}{{\textwidth}}{{L{{2.5cm}} L{{2.5cm}} L{{3cm}} R{{1.5cm}} X}}
+{thead}
 {table_body}
-\end{{longtable}}
+\end{{xltabular}}
 
 \end{{document}}
 """
