@@ -358,11 +358,11 @@ def build_latex(summary: dict, zone_chart: Path, loc_chart: Path,
             r"\begin{minipage}[t]{0.23\textwidth}"
             r"\centering"
             r"\colorbox{statbg}{\parbox{\dimexpr\linewidth-2\fboxsep}{"
-            r"\vspace{4pt}"
-            rf"\textbf{{\large\textcolor{{navy}}{{{value}}}}}\\"
-            r"\vspace{2pt}"
-            rf"\textbf{{\tiny\textcolor{{slate}}\MakeUppercase{{{label}}}}}"
-            r"\vspace{4pt}"
+            r"\hyphenpenalty=10000\exhyphenpenalty=10000"
+            r"\parbox[c][2.4cm][c]{\linewidth}{\centering"
+            rf"\textbf{{\LARGE\textcolor{{navy}}{{{value}}}}}\\[6pt]"
+            rf"\textbf{{\small\textcolor{{slate}}{{\MakeUppercase{{{label}}}}}}}"
+            r"}"
             r"}}"
             r"\end{minipage}"
         )
@@ -517,7 +517,7 @@ def build_latex(summary: dict, zone_chart: Path, loc_chart: Path,
   \colorbox{{navy}}{{\parbox{{\dimexpr\linewidth-2\fboxsep}}{{
     \vspace{{6pt}}
     \centering
-    \textbf{{\tiny\textcolor{{sky}}\MakeUppercase{{Overall Score}}}}\\[4pt]
+    \textbf{{\small\textcolor{{white}}{{\MakeUppercase{{Overall Score}}}}}}\\[4pt]
     \textbf{{\Huge\textcolor{{white}}{{{overall}\%}}}}
     \vspace{{6pt}}
   }}}}
