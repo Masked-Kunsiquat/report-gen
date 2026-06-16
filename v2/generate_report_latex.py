@@ -643,58 +643,61 @@ def build_latex(summary: dict, zone_chart: str, loc_chart: str, elem_chart: str,
 # Main
 # ---------------------------------------------------------------------------
 
-def main():
-    if len(sys.argv) < 2:
-        print("Usage: generate_report_latex.py <input.xlsx> [output.pdf]")
-        sys.exit(1)
+def generate_report(input_file: str, output_pdf: str = None, log=print) -> str:
+    """Generate a PDF report from an Excel inspection export.
 
-    input_file  = sys.argv[1]
-    output_pdf  = sys.argv[2] if len(sys.argv) > 2 else input_file.replace(".xlsx", "_report.pdf")
-    xelatex     = find_xelatex()
+    Args:
+        input_file: Path to the .xlsx file.
+        output_pdf:  Destination PDF path. Defaults to <input>_report.pdf.
+        log:         Callable for progress messages (default: print).
 
-    print(f"[1] Reading {input_file} ...")
+    Returns:
+        Absolute path to the generated PDF.
+    """
+    if output_pdf is None:
+        output_pdf = str(Path(input_file).with_suffix("")) + "_report.pdf"
+
+    xelatex = find_xelatex()
+
+    log(f"[1] Reading {Path(input_file).name} ...")
     df, filters, raw_df = load_inspections(input_file)
-    print(f"    {len(df)} complete rows across {df['Inspection #'].nunique()} inspections.")
+    log(f"    {len(df)} complete rows across {df['Inspection #'].nunique()} inspections.")
 
-    print("[2] Building summary ...")
-    summary = build_summary(df, filters)
+    log("[2] Building summary ...")
+    summary     = build_summary(df, filters)
     insp_images = extract_images(input_file, raw_df)
-    print(f"    Overall score : {summary['overall_score']}%")
-    print(f"    Work orders   : {len(summary['work_order_rows'])}")
-    print(f"    Images        : {sum(len(v) for v in insp_images.values())}")
+    log(f"    Overall score : {summary['overall_score']}%")
+    log(f"    Work orders   : {len(summary['work_order_rows'])}")
+    log(f"    Images        : {sum(len(v) for v in insp_images.values())}")
 
     with tempfile.TemporaryDirectory() as tmp:
         tmp_dir = Path(tmp)
 
-        print("[3] Rendering charts ...")
+        log("[3] Rendering charts ...")
         zone_chart = render_bar_chart_tex(summary["zone_scores"],    "Performance Scores by Zone")
         loc_chart  = render_bar_chart_tex(summary["loc_scores"],     "Performance Scores by Location Type")
         elem_chart = render_bar_chart_tex(summary["element_scores"], "Performance Scores by Element")
 
-        print("[4] Building LaTeX document ...")
+        log("[4] Building LaTeX document ...")
         latex_src = build_latex(summary, zone_chart, loc_chart, elem_chart, insp_images, tmp_dir)
 
         tex_file = tmp_dir / "report.tex"
         tex_file.write_text(latex_src, encoding="utf-8")
-        # Debug: copy tex to working dir for inspection
-        shutil.copy(tex_file, Path(input_file).with_suffix(".tex"))
 
-        print("[5] Compiling PDF (pass 1) ...")
-        result = subprocess.run(
+        log("[5] Compiling PDF (pass 1) ...")
+        subprocess.run(
             [xelatex, "-interaction=nonstopmode", "-output-directory", str(tmp_dir), str(tex_file)],
             capture_output=True, text=True
         )
         pdf_tmp = tmp_dir / "report.pdf"
         if not pdf_tmp.exists():
-            # Fatal — show last 30 lines of log
             log_file = tmp_dir / "report.log"
             if log_file.exists():
                 lines = log_file.read_text(encoding="utf-8", errors="replace").splitlines()
-                print("\n".join(lines[-30:]))
-            sys.exit(1)
+                log("\n".join(lines[-30:]))
+            raise RuntimeError("XeLaTeX failed — PDF not produced.")
 
-        # Second pass for longtable page references
-        print("[5] Compiling PDF (pass 2) ...")
+        log("[5] Compiling PDF (pass 2) ...")
         subprocess.run(
             [xelatex, "-interaction=nonstopmode", "-output-directory", str(tmp_dir), str(tex_file)],
             capture_output=True, text=True
@@ -702,7 +705,16 @@ def main():
 
         shutil.copy(pdf_tmp, output_pdf)
 
-    print(f"[Done] PDF saved to: {output_pdf}")
+    log(f"[Done] PDF saved to: {output_pdf}")
+    return str(Path(output_pdf).resolve())
+
+
+def main():
+    if len(sys.argv) < 2:
+        print("Usage: uv run --with pandas --with openpyxl generate_report_latex.py <input.xlsx> [output.pdf]")
+        sys.exit(1)
+    output_pdf = sys.argv[2] if len(sys.argv) > 2 else None
+    generate_report(sys.argv[1], output_pdf)
 
 
 if __name__ == "__main__":
