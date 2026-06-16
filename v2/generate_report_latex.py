@@ -4,7 +4,7 @@ Reads an inspection Excel export and produces a branded PDF via XeLaTeX.
 Charts are rendered as PNGs by matplotlib and included via \\includegraphics.
 
 Usage:
-    uv run --with pandas --with openpyxl --with matplotlib generate_report_latex.py <input.xlsx> [output.pdf]
+    uv run --with pandas --with openpyxl generate_report_latex.py <input.xlsx> [output.pdf]
 """
 
 import sys
@@ -20,10 +20,6 @@ from pathlib import Path
 from collections import defaultdict
 
 import pandas as pd
-import matplotlib
-matplotlib.use("Agg")
-import matplotlib.pyplot as plt
-import matplotlib.patches as mpatches
 
 
 # ---------------------------------------------------------------------------
@@ -241,45 +237,53 @@ def extract_images(file_path: str, raw_df: pd.DataFrame) -> dict:
 
 
 # ---------------------------------------------------------------------------
-# Chart rendering  (matplotlib → PNG files in tmp dir)
+# Chart rendering  (native TikZ — no external images)
 # ---------------------------------------------------------------------------
 
-def render_bar_chart_png(scores: pd.Series, title: str, out_path: Path) -> None:
+def _bar_color_name(score: float) -> str:
+    if score >= 85: return "bargreen"
+    if score >= 80: return "barambr"
+    return "barred"
+
+def render_bar_chart_tex(scores: pd.Series, title: str) -> str:
     labels = [str(l) for l in scores.index]
     values = scores.values.tolist()
-    colors = [hex_to_rgb(score_color(v)) for v in values]
 
-    fig_h = max(2.0, min(len(labels) * 0.32, 3.5))
-    fig, ax = plt.subplots(figsize=(6.9, fig_h))
-    fig.patch.set_facecolor("white")
-    ax.set_facecolor("white")
+    label_w = 5.0   # cm reserved for y-axis labels
+    score_w = 1.4   # cm reserved for score text after bar
+    row_sep = 0.52  # cm between bar centres
+    bar_h   = 0.30  # cm bar height
 
-    bars = ax.barh(labels, values, color=colors, height=0.55, zorder=2)
+    rows = []
+    for i, (label, value) in enumerate(zip(labels, values)):
+        color = _bar_color_name(value)
+        y = -i * row_sep
+        half = bar_h / 2
+        frac = value / 100.0
+        esc = tex(label)
+        rows.append(
+            rf"  \node[anchor=east,font=\scriptsize,text width={label_w - 0.1:.1f}cm,align=right]"
+            rf" at (0,{y:.3f}cm) {{{esc}}};"
+        )
+        rows.append(
+            rf"  \fill[{color}] (0,{y - half:.3f}cm) rectangle ({{{frac:.4f}\barw}},{y + half:.3f}cm);"
+        )
+        rows.append(
+            rf"  \node[anchor=west,font=\scriptsize\bfseries,text=navy]"
+            rf" at ({{{frac:.4f}\barw}},{y:.3f}cm) {{\,{value:.2f}\%}};"
+        )
 
-    ax.set_xlim(0, 105)
-    ax.xaxis.set_visible(False)
-    ax.spines[:].set_visible(False)
-    ax.tick_params(left=False)
-    ax.set_yticks(range(len(labels)))
-    ax.set_yticklabels(labels, fontsize=9, color="#222222")
-    ax.yaxis.set_tick_params(length=0)
-    ax.invert_yaxis()
-    ax.set_title(title, fontsize=10, fontweight="bold",
-                 color=NAVY, loc="left", pad=8)
-
-    # Score labels at end of each bar
-    for i, (bar, val) in enumerate(zip(bars, values)):
-        ax.text(val + 0.8, bar.get_y() + bar.get_height() / 2,
-                f"{val:.2f}%", va="center", ha="left", fontsize=8,
-                color=NAVY, fontweight="bold")
-
-    # Light gridlines
-    ax.set_axisbelow(True)
-    ax.xaxis.grid(False)
-
-    plt.tight_layout(pad=0.5)
-    fig.savefig(out_path, dpi=150, bbox_inches="tight", facecolor="white")
-    plt.close(fig)
+    total_h = (len(labels) - 1) * row_sep + bar_h
+    return "\n".join([
+        r"\noindent\begin{minipage}{\linewidth}",
+        rf"\noindent\textbf{{\small\textcolor{{navy}}{{{title}}}}}",
+        r"\par\vspace{3pt}",
+        r"\noindent\begin{tikzpicture}",
+        rf"  \setlength{{\barw}}{{\dimexpr\linewidth-{label_w:.1f}cm-{score_w:.1f}cm\relax}}",
+        *rows,
+        r"\end{tikzpicture}",
+        r"\end{minipage}",
+    ])
 
 
 # ---------------------------------------------------------------------------
@@ -326,7 +330,7 @@ def fwdslash(p) -> str:
     return str(p).replace("\\", "/")
 
 
-def build_latex(summary: dict, zone_chart: Path, loc_chart: Path,
+def build_latex(summary: dict, zone_chart: str, loc_chart: str,
                 insp_images: dict, tmp_dir: Path) -> str:
 
     venue       = tex(summary["venue"])
@@ -454,6 +458,8 @@ def build_latex(summary: dict, zone_chart: Path, loc_chart: Path,
 \usepackage{{geometry}}
 \usepackage{{xcolor}}
 \usepackage{{graphicx}}
+\usepackage{{tikz}}
+\usepackage{{calc}}
 \usepackage{{xltabular}}
 \usepackage{{booktabs}}
 \usepackage{{array}}
@@ -463,6 +469,7 @@ def build_latex(summary: dict, zone_chart: Path, loc_chart: Path,
 \usepackage{{microtype}}
 \usepackage{{parskip}}
 \usepackage{{multirow}}
+\usepackage{{lastpage}}
 
 % ---------- font ----------
 \setmainfont{{Segoe UI}}[
@@ -485,6 +492,10 @@ def build_latex(summary: dict, zone_chart: Path, loc_chart: Path,
 \definecolor{{theadrow}}{{RGB}}{{37,64,143}}
 \definecolor{{rowodd}}{{RGB}}{{255,255,255}}
 \definecolor{{roweven}}{{RGB}}{{240,243,246}}
+\definecolor{{bargreen}}{{HTML}}{{85CF5F}}
+\definecolor{{barambr}}{{HTML}}{{F0B557}}
+\definecolor{{barred}}{{HTML}}{{F05773}}
+\newlength{{\barw}}
 
 % ---------- running header (every page) ----------
 \pagestyle{{fancy}}
@@ -493,7 +504,7 @@ def build_latex(summary: dict, zone_chart: Path, loc_chart: Path,
 \fancyhead[L]{{{logo_tex}}}
 \fancyhead[C]{{\small\textcolor{{navy}}{{\textbf{{{venue}}}}}}}
 \fancyhead[R]{{\small\textcolor{{slate}}{{{date_str}}}}}
-\fancyfoot[C]{{\small\thepage}}
+\fancyfoot[R]{{\small\thepage\ of \pageref{{LastPage}}}}
 
 % ---------- table helpers ----------
 \newcolumntype{{L}}[1]{{>{{\raggedright\arraybackslash}}p{{#1}}}}
@@ -538,10 +549,10 @@ def build_latex(summary: dict, zone_chart: Path, loc_chart: Path,
 \vspace{{0.8cm}}
 
 % Charts
-\noindent\includegraphics[width=\textwidth,height=0.28\textheight,keepaspectratio]{{{fwdslash(zone_chart)}}}
+{zone_chart}
 
-\vspace{{0.3cm}}
-\noindent\includegraphics[width=\textwidth,height=0.28\textheight,keepaspectratio]{{{fwdslash(loc_chart)}}}
+\vspace{{0.5cm}}
+{loc_chart}
 
 \vspace{{0.8cm}}
 
@@ -590,10 +601,8 @@ def main():
         tmp_dir = Path(tmp)
 
         print("[3] Rendering charts ...")
-        zone_chart = tmp_dir / "zone_chart.png"
-        loc_chart  = tmp_dir / "loc_chart.png"
-        render_bar_chart_png(summary["zone_scores"], "Performance Scores by Zone", zone_chart)
-        render_bar_chart_png(summary["loc_scores"],  "Performance Scores by Location Type", loc_chart)
+        zone_chart = render_bar_chart_tex(summary["zone_scores"], "Performance Scores by Zone")
+        loc_chart  = render_bar_chart_tex(summary["loc_scores"],  "Performance Scores by Location Type")
 
         print("[4] Building LaTeX document ...")
         latex_src = build_latex(summary, zone_chart, loc_chart, insp_images, tmp_dir)
