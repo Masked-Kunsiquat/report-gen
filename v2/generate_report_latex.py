@@ -439,6 +439,8 @@ def build_latex(summary: dict, zone_chart: str, loc_chart: str, elem_chart: str,
         stat_card(len(summary["work_order_rows"]), "Deficiencies flagged"),
     ])
 
+    highlights = ""
+
     # --- Work orders table rows ---
     work_rows = summary["work_order_rows"]
     insp_scores = summary["insp_scores"]
@@ -606,6 +608,8 @@ def build_latex(summary: dict, zone_chart: str, loc_chart: str, elem_chart: str,
 % Stat cards
 \noindent
 {cards}
+
+{highlights}
 
 \newpage
 
