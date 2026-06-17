@@ -1,3 +1,7 @@
 @echo off
 cd /d "%~dp0"
-uv run --with pandas --with openpyxl report_gui.py
+if exist uv.exe (
+    uv.exe run --with pandas --with openpyxl report_gui.py
+) else (
+    uv run --with pandas --with openpyxl report_gui.py
+)
