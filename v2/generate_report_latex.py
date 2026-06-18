@@ -561,7 +561,7 @@ def build_latex(summary: dict, zone_chart: str, loc_chart: str, elem_chart: str,
     # Widths sum to 15.1cm; with 10*tabcolsep (1.4cm) the table is ~16.5cm < the
     # 17.59cm textwidth. Kept in COL_W so the colspec and the full-span inspection
     # rows stay in sync.
-    COL_W = {"zone": 2.7, "loc": 2.7, "elem": 2.7, "rating": 1.3, "comment": 5.7}
+    COL_W = {"zone": 2.7, "loc": 2.7, "elem": 2.7, "rating": 1.3, "comment": 6.7}
     colspec = (
         rf"L{{{COL_W['zone']}cm}} L{{{COL_W['loc']}cm}} L{{{COL_W['elem']}cm}} "
         rf"R{{{COL_W['rating']}cm}} L{{{COL_W['comment']}cm}}"
