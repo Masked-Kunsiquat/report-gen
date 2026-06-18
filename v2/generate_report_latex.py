@@ -654,7 +654,8 @@ def build_latex(summary: dict, zone_chart: str, loc_chart: str, elem_chart: str,
                 meta_parts.append(tex(date_txt))
             if inspector:
                 meta_parts.append(inspector)
-            meta_line  = r"\ \textbullet\ ".join(meta_parts)
+            sep        = r"\hspace{0.6em}\textcolor{slate!60}{\textbullet}\hspace{0.6em}"
+            meta_line  = sep.join(meta_parts)
             score_cell = rf"\textbf{{\textcolor[RGB]{{{score_rgb}}}{{{score_txt}}}}}"
 
             table_rows.append(
