@@ -828,6 +828,43 @@ def build_latex(summary: dict, zone_chart: str, loc_chart: str, elem_chart: str,
 
 
 # ---------------------------------------------------------------------------
+# XeLaTeX compilation
+# ---------------------------------------------------------------------------
+
+def _extract_latex_errors(log_text: str) -> list:
+    """Pull the meaningful error/warning lines out of a XeLaTeX .log."""
+    out = []
+    lines = log_text.splitlines()
+    for i, line in enumerate(lines):
+        low = line.lower()
+        keep = (
+            line.startswith("! ")                          # TeX error
+            or ("error" in low and ("package" in low or "latex" in low))
+            or "not found" in low or "cannot find" in low or "not loadable" in low
+            or ("missing" in low and "package" in low)
+            or "disable-installer" in low
+        )
+        if keep:
+            msg = line.strip()
+            nxt = lines[i + 1].strip() if i + 1 < len(lines) else ""
+            if nxt and not nxt.startswith("!"):
+                msg = f"{msg} {nxt}"
+            if msg not in out:
+                out.append(msg)
+    return out
+
+
+def _run_xelatex(xelatex: str, tex_file: Path, tmp_dir: Path) -> subprocess.CompletedProcess:
+    """Run one XeLaTeX pass with the package installer disabled (no popups; a
+    missing package fails clearly instead of trying to download from CTAN)."""
+    return subprocess.run(
+        [xelatex, "-disable-installer", "-interaction=nonstopmode",
+         "-output-directory", str(tmp_dir), str(tex_file)],
+        capture_output=True, text=True,
+    )
+
+
+# ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
 
@@ -848,6 +885,8 @@ def generate_report(input_file: str, output_pdf: str = None, log=print,
         output_pdf = str(Path(input_file).with_suffix("")) + "_report.pdf"
 
     xelatex = find_xelatex()
+    bundled = str(Path(__file__).parent / "miktex") in xelatex
+    log(f"[0] XeLaTeX: {xelatex}{'  (bundled)' if bundled else ''}")
 
     log(f"[1] Reading {Path(input_file).name} ...")
     df, filters, raw_df = load_inspections(input_file)
@@ -880,25 +919,29 @@ def generate_report(input_file: str, output_pdf: str = None, log=print,
         tex_file = tmp_dir / "report.tex"
         tex_file.write_text(latex_src, encoding="utf-8")
 
-        log("[5] Compiling PDF (pass 1) ...")
-        subprocess.run(
-            [xelatex, "-interaction=nonstopmode", "-output-directory", str(tmp_dir), str(tex_file)],
-            capture_output=True, text=True
-        )
+        log("[5] Compiling PDF (pass 1 of 2) ...")
+        _run_xelatex(xelatex, tex_file, tmp_dir)
         pdf_tmp = tmp_dir / "report.pdf"
         if not pdf_tmp.exists():
             log_file = tmp_dir / "report.log"
+            errors = []
             if log_file.exists():
-                lines = log_file.read_text(encoding="utf-8", errors="replace").splitlines()
-                log("\n".join(lines[-30:]))
-            raise RuntimeError("XeLaTeX failed — PDF not produced.")
+                errors = _extract_latex_errors(
+                    log_file.read_text(encoding="utf-8", errors="replace")
+                )
+            log("    XeLaTeX compilation failed. Details:")
+            for e in (errors[:15] or ["(no specific error lines found in the log)"]):
+                log(f"      {e}")
+            if any("installer" in e.lower() or "not found" in e.lower() for e in errors):
+                log("    HINT: a LaTeX package is missing from the bundled MiKTeX.")
+                log("          The bundle is incomplete — re-create it from a machine")
+                log("          where the report compiles, or install the named package.")
+            raise RuntimeError("XeLaTeX failed — see details above.")
 
-        log("[5] Compiling PDF (pass 2) ...")
-        subprocess.run(
-            [xelatex, "-interaction=nonstopmode", "-output-directory", str(tmp_dir), str(tex_file)],
-            capture_output=True, text=True
-        )
+        log("[6] Compiling PDF (pass 2 of 2) ...")
+        _run_xelatex(xelatex, tex_file, tmp_dir)
 
+        log("[7] Saving PDF ...")
         shutil.copy(pdf_tmp, output_pdf)
 
     log(f"[Done] PDF saved to: {output_pdf}")

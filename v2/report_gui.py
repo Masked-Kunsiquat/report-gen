@@ -5,8 +5,12 @@ Usage:
     uv run --with pandas --with openpyxl report_gui.py
 """
 
+import os
+import re
 import sys
+import time
 import threading
+import traceback
 import tkinter as tk
 from tkinter import filedialog, scrolledtext
 from pathlib import Path
@@ -25,6 +29,9 @@ GRAY  = "#F0F3F6"
 WHITE = "#FFFFFF"
 GREEN = "#85CF5F"
 RED   = "#F05773"
+AMBER = "#C98A2E"
+
+_STEP_RE = re.compile(r"^\s*\[\d+\]")
 
 
 # ---------------------------------------------------------------------------
@@ -162,8 +169,11 @@ class App(tk.Tk):
         body.rowconfigure(8, weight=1)
 
         # Tag colours for log messages
-        self._log_box.tag_config("ok",    foreground=GREEN)
+        self._log_box.tag_config("ok",    foreground="#3C9A2E")
         self._log_box.tag_config("err",   foreground=RED)
+        self._log_box.tag_config("warn",  foreground=AMBER)
+        self._log_box.tag_config("step",  foreground=NAVY, font=("Consolas", 9, "bold"))
+        self._log_box.tag_config("time",  foreground="#9AA3B2")
         self._log_box.tag_config("plain", foreground="#333333")
 
     # ------------------------------------------------------------------
@@ -187,17 +197,28 @@ class App(tk.Tk):
     # ------------------------------------------------------------------
     # Logging (thread-safe via after())
     # ------------------------------------------------------------------
-    def _log(self, msg: str):
-        if "[Done]" in msg:
-            tag = "ok"
-        elif "ERROR" in msg or "failed" in msg.lower():
-            tag = "err"
-        else:
-            tag = "plain"
-        self.after(0, lambda m=msg, t=tag: self._append(m, t))
+    @staticmethod
+    def _classify(msg: str) -> str:
+        low = msg.lower()
+        if "[done]" in low:
+            return "ok"
+        if "error" in low or "failed" in low or msg.strip().startswith("!"):
+            return "err"
+        if "hint" in low or "[warn]" in low or "missing" in low:
+            return "warn"
+        if _STEP_RE.match(msg):
+            return "step"
+        return "plain"
 
-    def _append(self, msg: str, tag: str):
+    def _log(self, msg: str):
+        ts  = time.strftime("%H:%M:%S")
+        tag = self._classify(msg)
+        self.after(0, lambda m=msg, t=tag, s=ts: self._append(m, t, s))
+
+    def _append(self, msg: str, tag: str = "plain", ts: str = None):
         self._log_box.configure(state="normal")
+        if ts:
+            self._log_box.insert("end", f"{ts}  ", "time")
         self._log_box.insert("end", msg + "\n", tag)
         self._log_box.see("end")
         self._log_box.configure(state="disabled")
@@ -227,17 +248,26 @@ class App(tk.Tk):
         def _worker():
             try:
                 gen.generate_report(input_file, output_pdf, log=self._log, comments=comments)
-                self.after(0, lambda: self._finish(True))
+                self.after(0, lambda: self._finish(True, output_pdf))
             except Exception as exc:
-                self._log(f"ERROR: {exc}")
-                self.after(0, lambda: self._finish(False))
+                self._log(f"ERROR: {type(exc).__name__}: {exc}")
+                for line in traceback.format_exc().strip().splitlines()[-4:]:
+                    self._log(f"    {line}")
+                self.after(0, lambda: self._finish(False, None))
 
         threading.Thread(target=_worker, daemon=True).start()
 
-    def _finish(self, success: bool):
+    def _finish(self, success: bool, output_pdf: str = None):
         self._running = False
         self._gen_btn.configure(state="normal", text="Generate Report")
-        if not success:
+        if success:
+            self._append("✓  Report generated successfully.", "ok")
+            if output_pdf and Path(output_pdf).exists() and hasattr(os, "startfile"):
+                try:
+                    os.startfile(output_pdf)  # open in default PDF viewer (Windows)
+                except OSError:
+                    pass
+        else:
             self._append("✗  Generation failed — see log above.", "err")
 
 
