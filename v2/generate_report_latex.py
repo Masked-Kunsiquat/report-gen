@@ -486,27 +486,38 @@ def _md_inline(text: str) -> str:
 def md_to_tex(text: str) -> str:
     """Convert a Markdown subset to LaTeX.
 
-    Supported: bullet lists (-, *, +), inline code, **bold**, *italic*, blank-line paragraphs.
+    Supported: nested bullet lists (-, *, +; indent with tabs or spaces),
+    inline code, **bold**, *italic*, # / ## headings, blank-line paragraphs.
     tex() is applied to plain text segments after Markdown tokens are extracted,
     so Markdown symbols are never pre-escaped into LaTeX commands.
     """
     lines = text.splitlines()
     out = []
-    in_list = False
+    indent_stack = []  # leading-whitespace widths of each currently-open itemize
 
-    for line in lines:
-        stripped = line.strip()
+    def close_to(width):
+        # close any open list levels deeper than `width`
+        while indent_stack and indent_stack[-1] > width:
+            indent_stack.pop()
+            out.append(r"\end{itemize}")
+
+    for raw in lines:
+        expanded = raw.expandtabs(4)
+        indent   = len(expanded) - len(expanded.lstrip(" "))
+        stripped = raw.strip()
         is_bullet = len(stripped) >= 2 and stripped[0] in "-*+" and stripped[1] == " "
 
         if is_bullet:
-            if not in_list:
+            if not indent_stack or indent > indent_stack[-1]:
+                indent_stack.append(indent)          # deeper → open a nested list
                 out.append(r"\begin{itemize}")
-                in_list = True
-            out.append(rf"  \item {_md_inline(stripped[2:])}")
+            elif indent < indent_stack[-1]:
+                close_to(indent)                     # shallower → close inner lists
+                if indent_stack:
+                    indent_stack[-1] = indent        # align level to this row
+            out.append(rf"{'  ' * len(indent_stack)}\item {_md_inline(stripped[2:])}")
         else:
-            if in_list:
-                out.append(r"\end{itemize}")
-                in_list = False
+            close_to(-1)                             # any non-bullet ends all lists
             if stripped == "":
                 out.append(r"\par\vspace{4pt}")
             elif stripped.startswith("## "):
@@ -516,9 +527,7 @@ def md_to_tex(text: str) -> str:
             else:
                 out.append(_md_inline(stripped))
 
-    if in_list:
-        out.append(r"\end{itemize}")
-
+    close_to(-1)
     return "\n".join(out)
 
 
