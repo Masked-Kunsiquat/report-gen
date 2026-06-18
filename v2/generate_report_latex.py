@@ -247,6 +247,67 @@ def extract_images(file_path: str, raw_df: pd.DataFrame) -> dict:
     return dict(result)
 
 
+def extract_image_links(file_path: str, max_per_insp: int = 6) -> dict:
+    """Read attachment image URLs (cell hyperlinks) keyed by Inspection #.
+
+    Some exports embed images; others put a filename in the Attachment column
+    with the real image behind a cell hyperlink. This reads those links.
+    """
+    import openpyxl
+    result = defaultdict(list)
+    wb = openpyxl.load_workbook(file_path, data_only=True)
+    if "Raw Data" not in wb.sheetnames:
+        return dict(result)
+    ws = wb["Raw Data"]
+    headers = {ws.cell(row=1, column=c).value: c for c in range(1, ws.max_column + 1)}
+    att_col  = headers.get("Attachment")
+    insp_col = headers.get("Inspection #")
+    if not att_col or not insp_col:
+        return dict(result)
+    for r in range(2, ws.max_row + 1):
+        cell = ws.cell(row=r, column=att_col)
+        url = cell.hyperlink.target if cell.hyperlink else None
+        if not url and isinstance(cell.value, str) and cell.value.startswith("http"):
+            url = cell.value
+        if not url:
+            continue
+        insp_id = str(ws.cell(row=r, column=insp_col).value or "").strip()
+        if insp_id and len(result[insp_id]) < max_per_insp:
+            result[insp_id].append(url)
+    return dict(result)
+
+
+def download_images(links_by_insp: dict, log=print, timeout: int = 15, workers: int = 8) -> dict:
+    """Download linked images concurrently. Returns bytes keyed by Inspection #."""
+    import urllib.request
+    from concurrent.futures import ThreadPoolExecutor
+
+    tasks = [(insp_id, url) for insp_id, urls in links_by_insp.items() for url in urls]
+    if not tasks:
+        return {}
+
+    def fetch(task):
+        insp_id, url = task
+        try:
+            req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+            with urllib.request.urlopen(req, timeout=timeout) as resp:
+                return insp_id, resp.read(), None
+        except Exception as exc:  # network error, 404, timeout, etc.
+            return insp_id, None, str(exc)
+
+    result = defaultdict(list)
+    ok = 0
+    with ThreadPoolExecutor(max_workers=workers) as ex:
+        for insp_id, data, err in ex.map(fetch, tasks):
+            if data:
+                result[insp_id].append(data)
+                ok += 1
+            else:
+                log(f"    [warn] image download failed: {err}")
+    log(f"    Downloaded {ok}/{len(tasks)} linked images.")
+    return dict(result)
+
+
 # ---------------------------------------------------------------------------
 # Chart rendering  (native TikZ — no external images)
 # ---------------------------------------------------------------------------
@@ -779,6 +840,12 @@ def generate_report(input_file: str, output_pdf: str = None, log=print,
     log("[2] Building summary ...")
     summary     = build_summary(df, filters)
     insp_images = extract_images(input_file, raw_df)
+    if not insp_images:
+        links = extract_image_links(input_file)
+        n_links = sum(len(v) for v in links.values())
+        if n_links:
+            log(f"    No embedded images; downloading {n_links} linked images ...")
+            insp_images = download_images(links, log=log)
     log(f"    Overall score : {summary['overall_score']}%")
     log(f"    Work orders   : {len(summary['work_order_rows'])}")
     log(f"    Images        : {sum(len(v) for v in insp_images.values())}")
