@@ -109,7 +109,11 @@ def comment_col(df: pd.DataFrame) -> str:
 
 def parse_location(location: str) -> tuple:
     location = str(location).strip()
-    for sep in (" - ", "_ "):
+    # Separators, most specific first (" - " is a superset of " -"):
+    #   " - " : "42 - Venue - Cubicles"          → space type = last segment
+    #   " -"  : "L1 Bldg_Common Areas -Space Name" (no space after dash)
+    #   "_ "  : legacy underscore-space format
+    for sep in (" - ", " -", "_ "):
         if sep in location:
             _, space = location.rsplit(sep, 1)
             return "", "", space.strip()
