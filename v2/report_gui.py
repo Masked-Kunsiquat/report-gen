@@ -34,8 +34,8 @@ class App(tk.Tk):
     def __init__(self):
         super().__init__()
         self.title(f"{_company} — Report Generator")
-        self.geometry("700x600")
-        self.resizable(False, False)
+        self.geometry("720x600")
+        self.resizable(False, True)
         self.configure(bg=WHITE)
         self._build_ui()
         self._running = False
@@ -52,9 +52,31 @@ class App(tk.Tk):
             font=("Segoe UI", 13, "bold"), fg=WHITE, bg=NAVY, pady=14
         ).pack(side="left", padx=20)
 
-        # Body
-        body = tk.Frame(self, bg=WHITE, padx=24, pady=20)
-        body.pack(fill="both", expand=True)
+        # Scrollable body
+        outer = tk.Frame(self, bg=WHITE)
+        outer.pack(fill="both", expand=True)
+
+        canvas = tk.Canvas(outer, bg=WHITE, highlightthickness=0)
+        scrollbar = tk.Scrollbar(outer, orient="vertical", command=canvas.yview)
+        canvas.configure(yscrollcommand=scrollbar.set)
+        scrollbar.pack(side="right", fill="y")
+        canvas.pack(side="left", fill="both", expand=True)
+
+        body = tk.Frame(canvas, bg=WHITE, padx=24, pady=20)
+        body_window = canvas.create_window((0, 0), window=body, anchor="nw")
+
+        def _on_resize(event):
+            canvas.itemconfig(body_window, width=event.width)
+        canvas.bind("<Configure>", _on_resize)
+
+        def _on_body_resize(event):
+            canvas.configure(scrollregion=canvas.bbox("all"))
+        body.bind("<Configure>", _on_body_resize)
+
+        def _on_mousewheel(event):
+            canvas.yview_scroll(int(-1 * (event.delta / 120)), "units")
+        canvas.bind_all("<MouseWheel>", _on_mousewheel)
+
         body.columnconfigure(0, weight=1)
 
         # --- Excel file ---
@@ -93,21 +115,14 @@ class App(tk.Tk):
                   relief="flat", padx=12, pady=5, cursor="hand2").grid(
             row=0, column=1, padx=(8, 0))
 
-        # --- Comments (collapsible) ---
-        self._comments_visible = tk.BooleanVar(value=False)
-        toggle_btn = tk.Button(
-            body, textvariable=tk.StringVar(), text="▶  COMMENTS (optional)",
-            font=("Segoe UI", 8, "bold"), fg=SLATE, bg=WHITE,
-            relief="flat", anchor="w", cursor="hand2",
-            command=self._toggle_comments
-        )
-        self._toggle_btn = toggle_btn
-        toggle_btn.grid(row=4, column=0, columnspan=2, sticky="ew", pady=(0, 4))
+        # --- Comments (optional, always visible) ---
+        tk.Label(body, text="COMMENTS (OPTIONAL)", font=("Segoe UI", 8, "bold"),
+                 fg=SLATE, bg=WHITE, anchor="w").grid(
+            row=4, column=0, columnspan=2, sticky="w", pady=(0, 4))
 
-        self._comments_frame = tk.Frame(body, bg=WHITE)
-        self._comments_frame.grid(row=5, column=0, columnspan=2, sticky="ew")
-        self._comments_frame.columnconfigure(0, weight=1)
-        self._comments_frame.grid_remove()
+        comments_frame = tk.Frame(body, bg=WHITE)
+        comments_frame.grid(row=5, column=0, columnspan=2, sticky="ew")
+        comments_frame.columnconfigure(0, weight=1)
 
         self._comment_boxes = {}
         for i, (key, label) in enumerate([
@@ -115,10 +130,10 @@ class App(tk.Tk):
             ("maintenance", "Maintenance Notes"),
             ("general",     "General Remarks"),
         ]):
-            tk.Label(self._comments_frame, text=label.upper(),
-                     font=("Segoe UI", 8, "bold"), fg=SLATE, bg=WHITE, anchor="w"
+            tk.Label(comments_frame, text=label.upper(),
+                     font=("Segoe UI", 8), fg=SLATE, bg=WHITE, anchor="w"
                      ).grid(row=i*2, column=0, sticky="w", pady=(6 if i else 0, 2))
-            box = tk.Text(self._comments_frame, height=3, font=("Segoe UI", 9),
+            box = tk.Text(comments_frame, height=3, font=("Segoe UI", 9),
                           relief="solid", bd=1, wrap="word", padx=6, pady=4)
             box.grid(row=i*2+1, column=0, sticky="ew", pady=(0, 2))
             self._comment_boxes[key] = box
@@ -131,7 +146,7 @@ class App(tk.Tk):
             relief="flat", pady=10, cursor="hand2",
             command=self._generate
         )
-        self._gen_btn.grid(row=6, column=0, columnspan=2, sticky="ew", pady=(8, 14))
+        self._gen_btn.grid(row=6, column=0, columnspan=2, sticky="ew", pady=(12, 14))
 
         # --- Log area ---
         tk.Label(body, text="LOG", font=("Segoe UI", 8, "bold"),
@@ -154,16 +169,6 @@ class App(tk.Tk):
     # ------------------------------------------------------------------
     # File pickers
     # ------------------------------------------------------------------
-    def _toggle_comments(self):
-        if self._comments_visible.get():
-            self._comments_frame.grid_remove()
-            self._comments_visible.set(False)
-            self._toggle_btn.config(text="▶  COMMENTS (optional)")
-        else:
-            self._comments_frame.grid()
-            self._comments_visible.set(True)
-            self._toggle_btn.config(text="▼  COMMENTS (optional)")
-
     def _browse_input(self):
         path = filedialog.askopenfilename(
             title="Select inspection Excel export",
