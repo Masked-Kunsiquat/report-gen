@@ -29,9 +29,10 @@ import pandas as pd
 XELATEX_CANDIDATES = [
     # Portable MiKTeX bundled alongside this script (gitignored)
     str(Path(__file__).parent / "miktex" / "texmfs" / "install" / "miktex" / "bin" / "x64" / "xelatex.exe"),
+    # Per-user MiKTeX install (resolves to the current user's home)
+    str(Path.home() / "AppData" / "Local" / "Programs" / "MiKTeX" / "miktex" / "bin" / "x64" / "xelatex.exe"),
     # System-wide installs
     "xelatex",
-    r"C:\Users\user\AppData\Local\Programs\MiKTeX\miktex\bin\x64\xelatex.exe",
     r"C:\Program Files\MiKTeX\miktex\bin\x64\xelatex.exe",
     r"C:\Program Files (x86)\MiKTeX\miktex\bin\xelatex.exe",
 ]
