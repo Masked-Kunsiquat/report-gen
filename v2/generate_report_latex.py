@@ -615,6 +615,7 @@ def build_latex(summary: dict, zone_chart: str, loc_chart: str, elem_chart: str,
 
     table_rows = []
     current_insp = None
+    last_def_idx = None  # index in table_rows of the most recent deficiency row
 
     for _, row in work_rows.iterrows():
         insp_id  = row.get("Inspection #", "")
@@ -630,6 +631,10 @@ def build_latex(summary: dict, zone_chart: str, loc_chart: str, elem_chart: str,
             rating = tex(str(rating_raw))
 
         if insp_id != current_insp:
+            # Close the previous group: allow a page break only after its last
+            # deficiency row, so an inspection never gets split across pages.
+            if last_def_idx is not None:
+                table_rows[last_def_idx] = table_rows[last_def_idx].replace(r"\\*\hline", r"\\\hline")
             current_insp = insp_id
             insp_score = insp_scores.get(insp_id, "")
             score_txt  = f"{insp_score}\\%" if insp_score != "" else ""
@@ -667,9 +672,12 @@ def build_latex(summary: dict, zone_chart: str, loc_chart: str, elem_chart: str,
                     r"\noalign{\hrule\penalty10000}"
                 )
 
+        # \\* keeps this row glued to the group; the group's last row is made
+        # breakable when the next group starts (see above).
         table_rows.append(
-            rf"{tex(zone)} & {tex(space)} & {tex(element)} & {rating} & {tex(comment)} \\\hline"
+            rf"{tex(zone)} & {tex(space)} & {tex(element)} & {rating} & {tex(comment)} \\*\hline"
         )
+        last_def_idx = len(table_rows) - 1
 
     table_body = "\n".join(table_rows)
 
