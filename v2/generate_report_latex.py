@@ -364,7 +364,9 @@ def tex(s: str) -> str:
         ("%",  "\\%"),
         ("$",  "\\$"),
         ("#",  "\\#"),
-        ("_",  "\\_"),
+        # allow a line break after underscores so long tokens like "Foo_Common"
+        # can wrap inside narrow fixed-width table columns
+        ("_",  "\\_\\allowbreak "),
         ("{",  "\\{"),
         ("}",  "\\}"),
         ("~",  "\\textasciitilde{}"),
@@ -441,6 +443,10 @@ def md_to_tex(text: str) -> str:
                 in_list = False
             if stripped == "":
                 out.append(r"\par\vspace{4pt}")
+            elif stripped.startswith("## "):
+                out.append(rf"\par\noindent\textbf{{\small {_md_inline(stripped[3:])}}}\par\nopagebreak")
+            elif stripped.startswith("# "):
+                out.append(rf"\par\noindent\textbf{{\normalsize {_md_inline(stripped[2:])}}}\par\nopagebreak")
             else:
                 out.append(_md_inline(stripped))
 
@@ -486,17 +492,31 @@ def build_latex(summary: dict, zone_chart: str, loc_chart: str, elem_chart: str,
     logo_path   = COMPANY.get("logo_path", "")
     company_name = tex(COMPANY.get("name", ""))
 
+    # Fixed-width p-columns (no tabularx X). Two reasons:
+    #   1. tabularx miscomputes X width when the table contains \multicolumn rows
+    #      (our inspection-header/score rows) — known incompatibility.
+    #   2. All-p-columns let \rowcolor fill every tabcolsep uniformly, so the
+    #      header bar has no uncolored gap (the X column's left gap was the bug).
+    # Widths sum to 15.1cm; with 10*tabcolsep (1.4cm) the table is ~16.5cm < the
+    # 17.59cm textwidth. Kept in COL_W so the colspec and the full-span inspection
+    # rows stay in sync.
+    COL_W = {"zone": 2.7, "loc": 2.7, "elem": 2.7, "rating": 1.3, "comment": 5.7}
+    colspec = (
+        rf"L{{{COL_W['zone']}cm}} L{{{COL_W['loc']}cm}} L{{{COL_W['elem']}cm}} "
+        rf"R{{{COL_W['rating']}cm}} L{{{COL_W['comment']}cm}}"
+    )
+    # Width a \multicolumn{5} cell spans: all column widths + the 4 internal
+    # column gaps (each 2*tabcolsep).
+    span_w = rf"\dimexpr {sum(COL_W.values()):.1f}cm+8\tabcolsep\relax"
+
     thead = (
         r"\rowcolor{theadrow}"
         r"\textcolor{white}{\textbf{Zone}} &"
         r"\textcolor{white}{\textbf{Location Type}} &"
         r"\textcolor{white}{\textbf{Element}} &"
-        # Merge cols 4+5 into one cell → no inter-column tabcolsep gap to color
-        r"\multicolumn{2}{l}{"
-        r"\makebox[1.5cm][r]{\textcolor{white}{\textbf{Rating}}}"
-        r"\hspace{2\tabcolsep}"
+        r"\textcolor{white}{\textbf{Rating}} &"
         r"\textcolor{white}{\textbf{Comments}}"
-        r"} \\\hline"
+        r" \\\hline"
         "\n"
         r"\endhead"
     )
@@ -558,7 +578,7 @@ def build_latex(summary: dict, zone_chart: str, loc_chart: str, elem_chart: str,
             date_txt   = comp_dt.strftime("%m/%d/%Y").lstrip("0").replace("/0", "/") if pd.notna(comp_dt) else ""
             inspector  = tex(meta.get("completed_by", ""))
 
-            meta_parts = [rf"\textbf{{\textcolor{{navy}}{{#{tex(str(insp_id))}}}}}", tex(location)]
+            meta_parts = [rf"\textbf{{\textcolor{{navy}}{{\#{tex(str(insp_id))}}}}}", tex(location)]
             if date_txt:
                 meta_parts.append(tex(date_txt))
             if inspector:
@@ -567,8 +587,8 @@ def build_latex(summary: dict, zone_chart: str, loc_chart: str, elem_chart: str,
             score_cell = rf"\textbf{{\textcolor[RGB]{{{score_rgb}}}{{{score_txt}}}}}"
 
             table_rows.append(
-                rf"\rowcolor{{inspbg}}\multicolumn{{4}}{{l}}{{\small {meta_line}}}"
-                rf" & \multicolumn{{1}}{{r}}{{\small {score_cell}}} \\"
+                rf"\rowcolor{{inspbg}}\multicolumn{{5}}{{>{{\raggedright\arraybackslash}}p{{{span_w}}}}}"
+                rf"{{\small {meta_line}\hfill {score_cell}}} \\"
                 r"\noalign{\hrule\penalty10000}"
             )
 
@@ -582,7 +602,7 @@ def build_latex(summary: dict, zone_chart: str, loc_chart: str, elem_chart: str,
                     img_cells.append(rf"\includegraphics[height=2cm,keepaspectratio]{{{fwdslash(img_file)}}}")
                 photos_tex = r"\quad ".join(img_cells)
                 table_rows.append(
-                    rf"\rowcolor{{photobg}}\multicolumn{{5}}{{l}}{{{photos_tex}}} \\"
+                    rf"\rowcolor{{photobg}}\multicolumn{{5}}{{>{{\raggedright\arraybackslash}}p{{{span_w}}}}}{{{photos_tex}}} \\"
                     r"\noalign{\hrule\penalty10000}"
                 )
 
@@ -639,6 +659,7 @@ def build_latex(summary: dict, zone_chart: str, loc_chart: str, elem_chart: str,
 \definecolor{{inspbg}}{{RGB}}{{221,227,240}}
 \definecolor{{photobg}}{{RGB}}{{247,248,252}}
 \definecolor{{theadrow}}{{RGB}}{{37,64,143}}
+\definecolor{{tablerule}}{{RGB}}{{180,186,200}}
 \definecolor{{rowodd}}{{RGB}}{{255,255,255}}
 \definecolor{{roweven}}{{RGB}}{{240,243,246}}
 \definecolor{{bargreen}}{{HTML}}{{85CF5F}}
@@ -658,6 +679,7 @@ def build_latex(summary: dict, zone_chart: str, loc_chart: str, elem_chart: str,
 % ---------- table helpers ----------
 \newcolumntype{{L}}[1]{{>{{\raggedright\arraybackslash}}p{{#1}}}}
 \newcolumntype{{R}}[1]{{>{{\raggedleft\arraybackslash}}p{{#1}}}}
+\setlength{{\parindent}}{{0pt}}
 \setlength{{\tabcolsep}}{{4pt}}
 \renewcommand{{\arraystretch}}{{1.3}}
 \setlength{{\arrayrulewidth}}{{0.4pt}}
@@ -713,13 +735,16 @@ def build_latex(summary: dict, zone_chart: str, loc_chart: str, elem_chart: str,
 % ══════════════════════════════════════════
 %  DEFICIENCY WORK ORDERS TABLE
 % ══════════════════════════════════════════
-{{\large\textbf{{\textcolor{{navy}}{{Deficiency Work Orders}}}}}}
+\noindent{{\large\textbf{{\textcolor{{navy}}{{Deficiency Work Orders}}}}}}
 \vspace{{0.3cm}}
 
-\begin{{xltabular}}{{\textwidth}}{{L{{2.5cm}} L{{2.5cm}} L{{3cm}} R{{1.5cm}} X}}
+% Fixed-width longtable (see COL_W in build_latex). \LTleft/\LTright pinned to
+% 0pt so longtable doesn't centre the table.
+\setlength\LTleft{{0pt}}\setlength\LTright{{0pt}}
+\noindent\begin{{longtable}}{{{colspec}}}
 {thead}
 {table_body}
-\end{{xltabular}}
+\end{{longtable}}
 
 \end{{document}}
 """
