@@ -394,8 +394,91 @@ def fwdslash(p) -> str:
     return str(p).replace("\\", "/")
 
 
+def _md_inline(text: str) -> str:
+    """Convert inline Markdown spans to LaTeX. tex() is applied to plain text segments only."""
+    pattern = re.compile(r'`([^`]+)`|\*\*([^*]+)\*\*|\*([^*]+)\*')
+    result = []
+    last = 0
+    for m in pattern.finditer(text):
+        if m.start() > last:
+            result.append(tex(text[last:m.start()]))
+        code, bold, italic = m.group(1), m.group(2), m.group(3)
+        if code is not None:
+            result.append(rf'\colorbox{{gray!15}}{{\texttt{{{tex(code)}}}}}')
+        elif bold is not None:
+            result.append(rf'\textbf{{{tex(bold)}}}')
+        elif italic is not None:
+            result.append(rf'\textit{{{tex(italic)}}}')
+        last = m.end()
+    if last < len(text):
+        result.append(tex(text[last:]))
+    return "".join(result)
+
+
+def md_to_tex(text: str) -> str:
+    """Convert a Markdown subset to LaTeX.
+
+    Supported: bullet lists (-, *, +), inline code, **bold**, *italic*, blank-line paragraphs.
+    tex() is applied to plain text segments after Markdown tokens are extracted,
+    so Markdown symbols are never pre-escaped into LaTeX commands.
+    """
+    lines = text.splitlines()
+    out = []
+    in_list = False
+
+    for line in lines:
+        stripped = line.strip()
+        is_bullet = len(stripped) >= 2 and stripped[0] in "-*+" and stripped[1] == " "
+
+        if is_bullet:
+            if not in_list:
+                out.append(r"\begin{itemize}")
+                in_list = True
+            out.append(rf"  \item {_md_inline(stripped[2:])}")
+        else:
+            if in_list:
+                out.append(r"\end{itemize}")
+                in_list = False
+            if stripped == "":
+                out.append(r"\par\vspace{4pt}")
+            else:
+                out.append(_md_inline(stripped))
+
+    if in_list:
+        out.append(r"\end{itemize}")
+
+    return "\n".join(out)
+
+
+def build_comments_tex(comments: dict) -> str:
+    """Render optional cover-page comments block. Only sections with content are shown."""
+    LABELS = [
+        ("client",  "Client Comments"),
+        ("maintenance", "Maintenance Notes"),
+        ("general", "General Remarks"),
+    ]
+    sections = [(label, comments[key]) for key, label in LABELS if comments.get(key, "").strip()]
+    if not sections:
+        return ""
+
+    rows = []
+    for i, (label, body) in enumerate(sections):
+        if i > 0:
+            rows.append(r"\par\vspace{6pt}")
+        rows.append(rf"\noindent\textbf{{\small\textcolor{{navy}}{{\MakeUppercase{{{tex(label)}}}}}}}\\[2pt]")
+        rows.append(rf"{{\small\color{{slate}}{{{md_to_tex(body)}}}}}")
+        rows.append(r"\par")
+
+    return "\n".join([
+        r"\vspace{0.5cm}",
+        r"\noindent\colorbox{statbg}{\parbox{\dimexpr\linewidth-2\fboxsep}{\vspace{8pt}",
+        *rows,
+        r"\vspace{8pt}}}",
+    ])
+
+
 def build_latex(summary: dict, zone_chart: str, loc_chart: str, elem_chart: str,
-                insp_images: dict, tmp_dir: Path) -> str:
+                insp_images: dict, tmp_dir: Path, comments: dict = None) -> str:
 
     venue       = tex(summary["venue"])
     date_str    = tex(summary["date_str"])
@@ -442,7 +525,7 @@ def build_latex(summary: dict, zone_chart: str, loc_chart: str, elem_chart: str,
         stat_card(len(summary["work_order_rows"]), "Deficiencies flagged"),
     ])
 
-    highlights = ""
+    highlights = build_comments_tex(comments or {})
 
     # --- Work orders table rows ---
     work_rows = summary["work_order_rows"]
@@ -646,13 +729,15 @@ def build_latex(summary: dict, zone_chart: str, loc_chart: str, elem_chart: str,
 # Main
 # ---------------------------------------------------------------------------
 
-def generate_report(input_file: str, output_pdf: str = None, log=print) -> str:
+def generate_report(input_file: str, output_pdf: str = None, log=print,
+                    comments: dict = None) -> str:
     """Generate a PDF report from an Excel inspection export.
 
     Args:
         input_file: Path to the .xlsx file.
         output_pdf:  Destination PDF path. Defaults to <input>_report.pdf.
         log:         Callable for progress messages (default: print).
+        comments:    Optional dict with keys 'client', 'maintenance', 'general'.
 
     Returns:
         Absolute path to the generated PDF.
@@ -682,7 +767,7 @@ def generate_report(input_file: str, output_pdf: str = None, log=print) -> str:
         elem_chart = render_bar_chart_tex(summary["element_scores"], "Performance Scores by Element")
 
         log("[4] Building LaTeX document ...")
-        latex_src = build_latex(summary, zone_chart, loc_chart, elem_chart, insp_images, tmp_dir)
+        latex_src = build_latex(summary, zone_chart, loc_chart, elem_chart, insp_images, tmp_dir, comments=comments)
 
         tex_file = tmp_dir / "report.tex"
         tex_file.write_text(latex_src, encoding="utf-8")
@@ -713,11 +798,20 @@ def generate_report(input_file: str, output_pdf: str = None, log=print) -> str:
 
 
 def main():
-    if len(sys.argv) < 2:
-        print("Usage: uv run --with pandas --with openpyxl generate_report_latex.py <input.xlsx> [output.pdf]")
-        sys.exit(1)
-    output_pdf = sys.argv[2] if len(sys.argv) > 2 else None
-    generate_report(sys.argv[1], output_pdf)
+    import argparse
+    parser = argparse.ArgumentParser(description="Generate facility inspection PDF report.")
+    parser.add_argument("input",  help="Path to inspection .xlsx file")
+    parser.add_argument("output", nargs="?", help="Output PDF path (default: <input>_report.pdf)")
+    parser.add_argument("--comments", metavar="FILE",
+                        help="JSON file with keys 'client', 'maintenance', 'general'")
+    args = parser.parse_args()
+
+    comments = {}
+    if args.comments:
+        with open(args.comments, encoding="utf-8") as f:
+            comments = json.load(f)
+
+    generate_report(args.input, args.output, comments=comments)
 
 
 if __name__ == "__main__":

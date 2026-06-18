@@ -34,7 +34,7 @@ class App(tk.Tk):
     def __init__(self):
         super().__init__()
         self.title(f"{_company} — Report Generator")
-        self.geometry("700x520")
+        self.geometry("700x600")
         self.resizable(False, False)
         self.configure(bg=WHITE)
         self._build_ui()
@@ -93,6 +93,36 @@ class App(tk.Tk):
                   relief="flat", padx=12, pady=5, cursor="hand2").grid(
             row=0, column=1, padx=(8, 0))
 
+        # --- Comments (collapsible) ---
+        self._comments_visible = tk.BooleanVar(value=False)
+        toggle_btn = tk.Button(
+            body, textvariable=tk.StringVar(), text="▶  COMMENTS (optional)",
+            font=("Segoe UI", 8, "bold"), fg=SLATE, bg=WHITE,
+            relief="flat", anchor="w", cursor="hand2",
+            command=self._toggle_comments
+        )
+        self._toggle_btn = toggle_btn
+        toggle_btn.grid(row=4, column=0, columnspan=2, sticky="ew", pady=(0, 4))
+
+        self._comments_frame = tk.Frame(body, bg=WHITE)
+        self._comments_frame.grid(row=5, column=0, columnspan=2, sticky="ew")
+        self._comments_frame.columnconfigure(0, weight=1)
+        self._comments_frame.grid_remove()
+
+        self._comment_boxes = {}
+        for i, (key, label) in enumerate([
+            ("client",      "Client Comments"),
+            ("maintenance", "Maintenance Notes"),
+            ("general",     "General Remarks"),
+        ]):
+            tk.Label(self._comments_frame, text=label.upper(),
+                     font=("Segoe UI", 8, "bold"), fg=SLATE, bg=WHITE, anchor="w"
+                     ).grid(row=i*2, column=0, sticky="w", pady=(6 if i else 0, 2))
+            box = tk.Text(self._comments_frame, height=3, font=("Segoe UI", 9),
+                          relief="solid", bd=1, wrap="word", padx=6, pady=4)
+            box.grid(row=i*2+1, column=0, sticky="ew", pady=(0, 2))
+            self._comment_boxes[key] = box
+
         # --- Generate button ---
         self._gen_btn = tk.Button(
             body, text="Generate Report",
@@ -101,20 +131,20 @@ class App(tk.Tk):
             relief="flat", pady=10, cursor="hand2",
             command=self._generate
         )
-        self._gen_btn.grid(row=4, column=0, columnspan=2, sticky="ew", pady=(0, 14))
+        self._gen_btn.grid(row=6, column=0, columnspan=2, sticky="ew", pady=(8, 14))
 
         # --- Log area ---
         tk.Label(body, text="LOG", font=("Segoe UI", 8, "bold"),
                  fg=SLATE, bg=WHITE, anchor="w").grid(
-            row=5, column=0, columnspan=2, sticky="w")
+            row=7, column=0, columnspan=2, sticky="w")
 
         self._log_box = scrolledtext.ScrolledText(
-            body, height=10, font=("Consolas", 9),
+            body, height=8, font=("Consolas", 9),
             state="disabled", bg=GRAY, relief="flat",
             wrap="word", padx=8, pady=8
         )
-        self._log_box.grid(row=6, column=0, columnspan=2, sticky="nsew", pady=(4, 0))
-        body.rowconfigure(6, weight=1)
+        self._log_box.grid(row=8, column=0, columnspan=2, sticky="nsew", pady=(4, 0))
+        body.rowconfigure(8, weight=1)
 
         # Tag colours for log messages
         self._log_box.tag_config("ok",    foreground=GREEN)
@@ -124,6 +154,16 @@ class App(tk.Tk):
     # ------------------------------------------------------------------
     # File pickers
     # ------------------------------------------------------------------
+    def _toggle_comments(self):
+        if self._comments_visible.get():
+            self._comments_frame.grid_remove()
+            self._comments_visible.set(False)
+            self._toggle_btn.config(text="▶  COMMENTS (optional)")
+        else:
+            self._comments_frame.grid()
+            self._comments_visible.set(True)
+            self._toggle_btn.config(text="▼  COMMENTS (optional)")
+
     def _browse_input(self):
         path = filedialog.askopenfilename(
             title="Select inspection Excel export",
@@ -177,9 +217,11 @@ class App(tk.Tk):
         self._gen_btn.configure(state="disabled", text="Generating…")
         self._append("─" * 60, "plain")
 
+        comments = {k: v.get("1.0", "end-1c") for k, v in self._comment_boxes.items()}
+
         def _worker():
             try:
-                gen.generate_report(input_file, output_pdf, log=self._log)
+                gen.generate_report(input_file, output_pdf, log=self._log, comments=comments)
                 self.after(0, lambda: self._finish(True))
             except Exception as exc:
                 self._log(f"ERROR: {exc}")
