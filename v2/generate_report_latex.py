@@ -634,7 +634,7 @@ def build_latex(summary: dict, zone_chart: str, loc_chart: str, elem_chart: str,
             # Close the previous group: allow a page break only after its last
             # deficiency row, so an inspection never gets split across pages.
             if last_def_idx is not None:
-                table_rows[last_def_idx] = table_rows[last_def_idx].replace(r"\\*\hline", r"\\\hline")
+                table_rows[last_def_idx] = table_rows[last_def_idx].replace(r"\\*\grouprule", r"\\\hline")
             current_insp = insp_id
             insp_score = insp_scores.get(insp_id, "")
             score_txt  = f"{insp_score}\\%" if insp_score != "" else ""
@@ -654,8 +654,7 @@ def build_latex(summary: dict, zone_chart: str, loc_chart: str, elem_chart: str,
 
             table_rows.append(
                 rf"\rowcolor{{inspbg}}\multicolumn{{5}}{{>{{\raggedright\arraybackslash}}p{{{span_w}}}}}"
-                rf"{{\small {meta_line}\hfill {score_cell}}} \\"
-                r"\noalign{\hrule\penalty10000}"
+                rf"{{\small {meta_line}\hfill {score_cell}}} \\*\grouprule"
             )
 
             # Photo strip if images exist
@@ -668,14 +667,13 @@ def build_latex(summary: dict, zone_chart: str, loc_chart: str, elem_chart: str,
                     img_cells.append(rf"\includegraphics[height=2cm,keepaspectratio]{{{fwdslash(img_file)}}}")
                 photos_tex = r"\quad ".join(img_cells)
                 table_rows.append(
-                    rf"\rowcolor{{photobg}}\multicolumn{{5}}{{>{{\raggedright\arraybackslash}}p{{{span_w}}}}}{{{photos_tex}}} \\"
-                    r"\noalign{\hrule\penalty10000}"
+                    rf"\rowcolor{{photobg}}\multicolumn{{5}}{{>{{\raggedright\arraybackslash}}p{{{span_w}}}}}{{{photos_tex}}} \\*\grouprule"
                 )
 
         # \\* keeps this row glued to the group; the group's last row is made
         # breakable when the next group starts (see above).
         table_rows.append(
-            rf"{tex(zone)} & {tex(space)} & {tex(element)} & {rating} & {tex(comment)} \\*\hline"
+            rf"{tex(zone)} & {tex(space)} & {tex(element)} & {rating} & {tex(comment)} \\*\grouprule"
         )
         last_def_idx = len(table_rows) - 1
 
@@ -752,6 +750,10 @@ def build_latex(summary: dict, zone_chart: str, loc_chart: str, elem_chart: str,
 \setlength{{\tabcolsep}}{{4pt}}
 \renewcommand{{\arraystretch}}{{1.3}}
 \setlength{{\arrayrulewidth}}{{0.4pt}}
+% Non-breaking row rule: longtable allows a page break at every \hline, which
+% would split an inspection group. \grouprule draws the same rule but wraps it
+% in \nobreak penalties so breaks can only happen at a group's last row (\hline).
+\newcommand{{\grouprule}}{{\noalign{{\nobreak\hrule height\arrayrulewidth\nobreak}}}}
 
 \begin{{document}}
 
