@@ -108,17 +108,57 @@ def comment_col(df: pd.DataFrame) -> str:
     return "Comments" if "Comments" in df.columns else "Comment"
 
 
+# Canonical location-type names mapped to the spelling/format variants that
+# should collapse into them. Keys (lowercased, whitespace-collapsed) are matched
+# after a generic cleanup pass (underscores → spaces, trailing instance number
+# like "Elevator 2" stripped). Extend this bank as new exports surface variants.
+LOCATION_TYPE_BANK = {
+    "Elevators":        ["elevator", "elevators"],
+    "Elevator Lobby":   ["elevator lobby"],
+    "Reception/Lobby":  ["reception lobby", "reception/lobby"],
+    "Men's Restroom":   ["men's restroom", "mens restroom", "men restroom",
+                         "men's rr", "mens rr", "men's restrooms"],
+    "Women's Restroom": ["women's restroom", "womens restroom", "women restroom",
+                         "women's rr", "womens rr", "women's restrooms"],
+    "Unisex Restroom":  ["unisex restroom", "unisex restrooms", "unisex rr", "unisex rrs"],
+    "Break Rooms":      ["break room", "break rooms", "breakroom", "breakrooms"],
+    "Conference Rooms": ["conference room", "conference rooms"],
+    "Copy Rooms":       ["copy room", "copy rooms", "copy areas-rooms", "copy areas/rooms"],
+    "Corridors":        ["corridor", "corridors"],
+    "Cubicles":         ["cubicle", "cubicles"],
+    "Offices":          ["office", "offices"],
+    "Wellness Rooms":   ["wellness room", "wellness rooms"],
+    "Work Rooms":       ["work room", "work rooms", "workroom", "workrooms"],
+    # Add synonym merges here as needed, e.g. "Corridors": [..., "hallway", "hallways"]
+}
+_TYPE_LOOKUP = {v: canon for canon, variants in LOCATION_TYPE_BANK.items() for v in variants}
+
+
+def normalize_location_type(raw: str) -> str:
+    """Collapse a raw location-type label to its canonical form.
+
+    Cleanup: underscores → spaces, strip a trailing instance number
+    ("Elevator 2" → "Elevator"), collapse whitespace. Then look up the result
+    in LOCATION_TYPE_BANK; unmatched labels are returned cleaned but unchanged.
+    """
+    s = str(raw).replace("_", " ").strip()
+    s = re.sub(r"\s+#?\d+$", "", s).strip()       # "Elevator 2" → "Elevator"
+    key = re.sub(r"\s+", " ", s).lower()
+    return _TYPE_LOOKUP.get(key, s)
+
+
 def parse_location(location: str) -> tuple:
     location = str(location).strip()
     # Separators, most specific first (" - " is a superset of " -"):
     #   " - " : "42 - Venue - Cubicles"          → space type = last segment
     #   " -"  : "L1 Bldg_Common Areas -Space Name" (no space after dash)
     #   "_ "  : legacy underscore-space format
+    space = location
     for sep in (" - ", " -", "_ "):
         if sep in location:
             _, space = location.rsplit(sep, 1)
-            return "", "", space.strip()
-    return "", "", location
+            break
+    return "", "", normalize_location_type(space.strip())
 
 
 def drop_image_stubs(df: pd.DataFrame) -> pd.DataFrame:
