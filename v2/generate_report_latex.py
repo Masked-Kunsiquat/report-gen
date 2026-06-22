@@ -158,7 +158,11 @@ LOCATION_TYPE_BANK = {
     "Office":                     ["office", "offices"],
     # Not in the platform vocabulary list but seen in existing exports — kept so
     # those reports still display cleanly:
-    "Wellness Rooms":             ["wellness room", "wellness rooms"],
+    "Wellness Rooms":                 ["wellness room", "wellness rooms"],
+    "Laundry Room":                   ["laundry room", "laundry rooms"],
+    "Student Area":                   ["student area", "student areas"],
+    "Restroom-Lavatory-Locker Rooms": ["restroom-lavatory-locker rooms",
+                                       "restroom-lavatory-locker room"],
 }
 _TYPE_LOOKUP = {v: canon for canon, variants in LOCATION_TYPE_BANK.items() for v in variants}
 
