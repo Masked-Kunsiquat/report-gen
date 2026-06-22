@@ -108,28 +108,57 @@ def comment_col(df: pd.DataFrame) -> str:
     return "Comments" if "Comments" in df.columns else "Comment"
 
 
-# Canonical location-type names mapped to the spelling/format variants that
-# should collapse into them. Keys (lowercased, whitespace-collapsed) are matched
-# after a generic cleanup pass (underscores → spaces, trailing instance number
-# like "Elevator 2" stripped). Extend this bank as new exports surface variants.
+# Canonical location-type names — taken verbatim from the inspection platform's
+# vocabulary — mapped to the spelling/format variants that should collapse into
+# them. Variant keys are matched after a generic cleanup pass (underscores →
+# spaces, a trailing instance number like "Elevator 2" stripped, whitespace
+# collapsed, lowercased). Each canonical's own cleaned form is included so it
+# maps to itself. Unmatched labels pass through cleaned but otherwise unchanged.
+# "~" notes in the source vocabulary are folded in as variants.
 LOCATION_TYPE_BANK = {
-    "Elevators":        ["elevator", "elevators"],
-    "Elevator Lobby":   ["elevator lobby"],
-    "Reception/Lobby":  ["reception lobby", "reception/lobby"],
-    "Men's Restroom":   ["men's restroom", "mens restroom", "men restroom",
-                         "men's rr", "mens rr", "men's restrooms"],
-    "Women's Restroom": ["women's restroom", "womens restroom", "women restroom",
-                         "women's rr", "womens rr", "women's restrooms"],
-    "Unisex Restroom":  ["unisex restroom", "unisex restrooms", "unisex rr", "unisex rrs"],
-    "Break Rooms":      ["break room", "break rooms", "breakroom", "breakrooms"],
-    "Conference Rooms": ["conference room", "conference rooms"],
-    "Copy Rooms":       ["copy room", "copy rooms", "copy areas-rooms", "copy areas/rooms"],
-    "Corridors":        ["corridor", "corridors"],
-    "Cubicles":         ["cubicle", "cubicles"],
-    "Offices":          ["office", "offices"],
-    "Wellness Rooms":   ["wellness room", "wellness rooms"],
-    "Work Rooms":       ["work room", "work rooms", "workroom", "workrooms"],
-    # Add synonym merges here as needed, e.g. "Corridors": [..., "hallway", "hallways"]
+    "Vacant":                     ["vacant"],
+    "Fitness Center":             ["fitness center", "fitness centers"],
+    "Dance Studio":               ["dance studio", "dance studios"],
+    "Freight Lobby":              ["freight lobby"],
+    "Elevators":                  ["elevator", "elevators"],
+    "Restricted Area":            ["restricted area", "restricted areas"],
+    "Work Room":                  ["work room", "work rooms", "workroom", "workrooms"],
+    "Men's Locker Room":          ["men's locker room", "mens locker room", "men's locker rooms"],
+    "Women's Locker Room":        ["women's locker room", "womens locker room", "women's locker rooms"],
+    "Mechanical - Electric Room": ["mechanical - electric room", "mechanical electric room",
+                                   "mechanical/electric room", "electric room", "mechanical room"],
+    "Exam Room":                  ["exam room", "exam rooms"],
+    "Lab Space":                  ["lab space", "lab spaces"],
+    "Reception_Lobby":            ["reception lobby", "reception/lobby"],
+    "Elevator Lobby Landing":     ["elevator lobby landing", "elevator lobby"],
+    "Data Center":                ["data center", "data centers"],
+    "Library":                    ["library", "libraries"],
+    "File Room":                  ["file room", "file rooms"],
+    "Team Room":                  ["team room", "team rooms"],
+    "Mother Friendly Room":       ["mother friendly room", "mother friendly rooms"],
+    "Phone_Quiet_Focus Room":     ["phone quiet focus room", "phone/quiet/focus room"],
+    "Stairwells":                 ["stairwell", "stairwells"],
+    "Pantry-Kitchen-Cafeteria":   ["pantry-kitchen-cafeteria"],
+    "IDF Room":                   ["idf room", "idf rooms"],
+    "Janitor Closets":            ["janitor closet", "janitor closets",
+                                   "janitorial closet", "janitorial closets"],
+    "Unisex RR":                  ["unisex rr", "unisex rrs", "unisex restroom", "unisex restrooms"],
+    "Men's RR":                   ["men's rr", "mens rr", "men's restroom", "mens restroom",
+                                   "men restroom", "men's restrooms"],
+    "Women's RR":                 ["women's rr", "womens rr", "women's restroom", "womens restroom",
+                                   "women restroom", "women's restrooms"],
+    "Supply Closet":              ["supply closet", "supply closets"],
+    "Exterior":                   ["exterior", "exteriors"],
+    "Conference Room":            ["conference room", "conference rooms"],
+    "Copy Rooms":                 ["copy room", "copy rooms", "copy areas-rooms", "copy areas/rooms"],
+    "Corridor":                   ["corridor", "corridors"],
+    "Hallways":                   ["hallway", "hallways"],   # distinct from Corridor
+    "Break Room":                 ["break room", "break rooms", "breakroom", "breakrooms"],
+    "Cubicles":                   ["cubicle", "cubicles"],
+    "Office":                     ["office", "offices"],
+    # Not in the platform vocabulary list but seen in existing exports — kept so
+    # those reports still display cleanly:
+    "Wellness Rooms":             ["wellness room", "wellness rooms"],
 }
 _TYPE_LOOKUP = {v: canon for canon, variants in LOCATION_TYPE_BANK.items() for v in variants}
 
